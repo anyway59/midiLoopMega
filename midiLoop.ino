@@ -1,29 +1,41 @@
 #include <uClock.h>
 #include <MIDI.h>
+#include <SSD1306Ascii.h>
+#include <SSD1306AsciiAvrI2c.h>
+#include <SSD1306init.h>
+#include "button.h"
 
-#define TEMPO_ANALOG_IN 0
-#define BARCOUNT_ANALOG_IN 1
-#define STEPCOUNT_ANALOG_IN 2
-#define MIDITHRU_ANALOG_IN 3
-#define TRANSPOSE_ANALOG_IN 4
-#define SHIFT_ANALOG_IN 5
-#define ERASE_ANALOG_IN 6
-#define PLAYSTOP_ANALOG_IN 7
+#define I2C_ADDRESS 0x3C
+SSD1306AsciiAvrI2c display;
 
-#define CHANNEL_4_LED 2
-#define CHANNEL_3_LED 3
-#define CHANNEL_1_LED 4 // Yes, I inverted the 1 & 2 LEDS when I built my box :|
-#define CHANNEL_2_LED 5
+// #define TEMPO_ANALOG_IN 0
+// #define BARCOUNT_ANALOG_IN 1
+// #define STEPCOUNT_ANALOG_IN 2
+// #define MIDITHRU_ANALOG_IN 3
+// #define TRANSPOSE_ANALOG_IN 4
+// #define SHIFT_ANALOG_IN 5
+// #define ERASE_ANALOG_IN 6
+// #define PLAYSTOP_ANALOG_IN 7
 
-#define OUT_GATE 6
-#define OUT_SYNC 7
+#define SHIFT_PIN 12 
+#define ERASE_PIN 11
+#define PLAYSTOP_PIN 10
+#define ROTARY_PUSH_PIN 9
 
-#define CHANNEL_4_PIN 8
-#define CHANNEL_3_PIN 9
-#define CHANNEL_2_PIN 10
-#define CHANNEL_1_PIN 11
+// #define CHANNEL_4_LED 2
+// #define CHANNEL_3_LED 3
+// #define CHANNEL_1_LED 4 // Yes, I inverted the 1 & 2 LEDS when I built my box :|
+// #define CHANNEL_2_LED 5
 
-#define BEATOUT_LED 12
+// #define OUT_GATE 6
+// #define OUT_SYNC 7
+
+#define CHANNEL_4_PIN 8  // was 8
+#define CHANNEL_3_PIN 7 // was 9
+#define CHANNEL_2_PIN 6 // was 10
+#define CHANNEL_1_PIN 5 // was 11
+
+// #define BEATOUT_LED 12
 
 #define CHANNEL_COUNT 4
 #define SEQUENCE_LENGTH_MAX 128
@@ -40,7 +52,18 @@
 //This will map channel 5,6,7,8 as channel 1,2,3,4 MIDI thru
 #define USE_MIDI_THRU_CHANNELS 1
 
-byte ledPins[4] = {CHANNEL_1_LED, CHANNEL_2_LED, CHANNEL_3_LED, CHANNEL_4_LED};
+//byte ledPins[4] = {CHANNEL_1_LED, CHANNEL_2_LED, CHANNEL_3_LED, CHANNEL_4_LED};
+
+// buttons
+Button btn1;
+Button btn2;
+Button btn3;
+Button btn4;
+Button btnShift;
+Button btnErase;
+Button btnPlayStop;
+Button btnRotaryPush;    // rotary encoder push
+
 
 bool isMuted[4] = {false, false, false, false};
 
@@ -132,7 +155,9 @@ void clockOutput16PPQN(uint32_t* tick) {
   }
 
   bool isQuarterBeat = (((currentPosition % currentStepCount) % 4) == 0);
-  digitalWrite(BEATOUT_LED, isQuarterBeat); 
+  //digitalWrite(BEATOUT_LED, isQuarterBeat); 
+  display.setCursor(0,4);
+  display.print("X");
 
   if (!arpIsOn) {
     
@@ -174,8 +199,8 @@ void clockOutput32PPQN(uint32_t* tick) {
     return;
   }
   
-  digitalWrite(OUT_GATE, (*tick % 2) == 0 ? HIGH : LOW);
-  digitalWrite(OUT_SYNC, (*tick % 4) < 2 ? HIGH : LOW);
+  // digitalWrite(OUT_GATE, (*tick % 2) == 0 ? HIGH : LOW);
+  // digitalWrite(OUT_SYNC, (*tick % 4) < 2 ? HIGH : LOW);
 }
 
 void clockOutput96PPQN(uint32_t* tick) {
@@ -187,6 +212,28 @@ void clockOutput96PPQN(uint32_t* tick) {
 }
 
 void setup() {
+    // display
+    display.begin(&Adafruit128x64, I2C_ADDRESS);
+    display.setFont(Adafruit5x7);
+    display.clear();
+    
+    display.set1X();
+    display.println("");
+    display.println("MIDILOOP TEST");
+    delay(3000);
+    display.clear();
+
+    // buttons
+    btn1.begin(CHANNEL_1_PIN);
+    btn2.begin(CHANNEL_2_PIN);
+    btn3.begin(CHANNEL_3_PIN);
+    btn4.begin(CHANNEL_4_PIN);
+    btnShift.begin(SHIFT_PIN);
+    btnErase.begin(ERASE_PIN);
+    btnPlayStop.begin(PLAYSTOP_PIN);
+    btnRotaryPush.begin(ROTARY_PUSH_PIN); // rotary push
+
+    
   //Serial.begin(31250);
   TCCR1B = TCCR1B & B11111000 | B00000001;  
   uClock.init();
@@ -209,20 +256,20 @@ void setup() {
       previousNote[channel] = 0;
   }
 
-  pinMode(CHANNEL_1_LED, OUTPUT);
-  pinMode(CHANNEL_2_LED, OUTPUT);
-  pinMode(CHANNEL_3_LED, OUTPUT);
-  pinMode(CHANNEL_4_LED, OUTPUT);
+ // pinMode(CHANNEL_1_LED, OUTPUT);
+ // pinMode(CHANNEL_2_LED, OUTPUT);
+ // pinMode(CHANNEL_3_LED, OUTPUT);
+ // pinMode(CHANNEL_4_LED, OUTPUT);
 
-  pinMode(CHANNEL_1_PIN, INPUT);
-  pinMode(CHANNEL_2_PIN, INPUT);
-  pinMode(CHANNEL_3_PIN, INPUT);
-  pinMode(CHANNEL_4_PIN, INPUT);
+  // pinMode(CHANNEL_1_PIN, INPUT);
+  // pinMode(CHANNEL_2_PIN, INPUT);
+  // pinMode(CHANNEL_3_PIN, INPUT);
+  // pinMode(CHANNEL_4_PIN, INPUT);
 
-  pinMode(BEATOUT_LED, OUTPUT);
+  //pinMode(BEATOUT_LED, OUTPUT);
 
-  pinMode(OUT_GATE, OUTPUT);
-  pinMode(OUT_SYNC, OUTPUT);
+  // pinMode(OUT_GATE, OUTPUT);
+  // pinMode(OUT_SYNC, OUTPUT);
 
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -241,20 +288,25 @@ void setup() {
 }
 
 void handleShift() {
-  int shiftState = analogRead(SHIFT_ANALOG_IN);
-  shiftIsPressed = (shiftState > 200);
+  if (btnShift.debounce()) {
+    shiftIsPressed = true;
+  }
+ // int shiftState = analogRead(SHIFT_ANALOG_IN);
+ // shiftIsPressed = (shiftState > 200);
 }
 
 void handleErase() {
-  int erase = analogRead(ERASE_ANALOG_IN);
+  //int erase = analogRead(ERASE_ANALOG_IN);
 
-  if (erase > 200) {
+ // if (erase > 200) {
+    if (btnErase.debounce()) {
       if (!shiftIsPressed) {
         sequence[currentChannel][currentPosition] = 0;
       } else {
         for (size_t step = 0; step < SEQUENCE_LENGTH_MAX; step++) {
           sequence[currentChannel][step] = 0;
         }
+        shiftIsPressed = false;
       }
   }
 }
@@ -268,16 +320,19 @@ void eraseAll() {
 }
 
 void handleTempo() {
-  int tempoPot = analogRead(TEMPO_ANALOG_IN);
-  float tempo = round(((float)tempoPot/1024.f)*(TEMPO_MAX - TEMPO_MIN) + TEMPO_MIN);
+  // int tempoPot = analogRead(TEMPO_ANALOG_IN);
+  //float tempo = round(((float)tempoPot/1024.f)*(TEMPO_MAX - TEMPO_MIN) + TEMPO_MIN);
+  float tempo = 120.0;
 
   uClock.setTempo(tempo);
 }
 
 void handleBarCount() {
-  int pot = analogRead(BARCOUNT_ANALOG_IN);
-  byte maxValue = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX;
-  int nextBarCount = round(((float)pot/1024.f)*(maxValue - 1) + 1);
+  //int pot = analogRead(BARCOUNT_ANALOG_IN);
+  //byte maxValue = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX;
+  //int nextBarCount = round(((float)pot/1024.f)*(maxValue - 1) + 1);
+
+  int nextBarCount = 1;
   
   if (nextBarCount != currentBarCount) {
     currentBarCount = nextBarCount;
@@ -288,8 +343,10 @@ void handleBarCount() {
 }
 
 void handleStepCount() {
-  int pot = analogRead(STEPCOUNT_ANALOG_IN);
-  int nextStepCount = round(((float)pot/1024.f)*(STEP_PER_BAR_MAX - 1) + 1);
+  //int pot = analogRead(STEPCOUNT_ANALOG_IN);
+  //int nextStepCount = round(((float)pot/1024.f)*(STEP_PER_BAR_MAX - 1) + 1);
+
+  int nextStepCount = STEP_PER_BAR_MAX;
 
   if (nextStepCount != currentStepCount) {
     currentStepCount = nextStepCount;
@@ -304,7 +361,14 @@ void displayIntValue(int value) {
 
    for (int i = 0; i < CHANNEL_COUNT; i++) {
      int state = value & b[i];
-     digitalWrite(ledPins[i], (state > 0) ? HIGH : LOW);
+     //digitalWrite(ledPins[i], (state > 0) ? HIGH : LOW);
+     display.setCursor(i*3,2);
+     if (state > 0) {
+        display.print(i);
+     }
+     else {
+        display.print(" ");      
+     }
    }
 
    delayStart = millis();
@@ -313,13 +377,15 @@ void displayIntValue(int value) {
 
 
 void handleMidiThru() {
-  int midiThruState = analogRead(MIDITHRU_ANALOG_IN);
-  midiThru = (midiThruState > 200);
+ // int midiThruState = analogRead(MIDITHRU_ANALOG_IN);
+ // midiThru = (midiThruState > 200);
+  midiThru = false;
 }
 
 void handleTranspose() {
-  int transposeState = analogRead(TRANSPOSE_ANALOG_IN);
-  transposeMode = (transposeState > 200);
+  // int transposeState = analogRead(TRANSPOSE_ANALOG_IN);
+  // transposeMode = (transposeState > 200);
+  transposeMode = false;
 }
 
 void handleCurrentChannel() {
@@ -331,6 +397,8 @@ void handleCurrentChannel() {
   channelStates[3] = digitalRead(CHANNEL_4_PIN) == HIGH;
 
   if (shiftIsPressed) {
+
+    shiftIsPressed = false;
     
     if (channelStates[0] && !fillIsDone) { //FILL MODE
       fill();
@@ -354,7 +422,14 @@ void handleCurrentChannel() {
     if (!delayIsRunning) {
       for (byte i = 0; i < CHANNEL_COUNT; i++) {
         bool state = i == (currentChannel); 
-        digitalWrite(ledPins[i], state ? HIGH : LOW);
+        //digitalWrite(ledPins[i], state ? HIGH : LOW);
+         display.setCursor(i*3,2);
+         if (state == true) {
+            display.print(i);
+         }
+         else {
+            display.print(" ");      
+         }
       }
     }
   }
@@ -386,9 +461,12 @@ void setIsPlaying(bool state) {
       }
     }
         
-    digitalWrite(OUT_GATE, LOW);
-    digitalWrite(OUT_SYNC, LOW);
-    digitalWrite(BEATOUT_LED, LOW); 
+    // digitalWrite(OUT_GATE, LOW);
+    // digitalWrite(OUT_SYNC, LOW);
+    //digitalWrite(BEATOUT_LED, LOW); 
+    display.setCursor(0,4);
+    display.print(" ");      
+
     //delay(20);
     currentPosition = 0;
         
@@ -396,21 +474,36 @@ void setIsPlaying(bool state) {
 }
 
 void handleStartStop() {
-  int startStopStart = analogRead(PLAYSTOP_ANALOG_IN);
-  bool newPlayingState = (startStopStart > 200);
-
-  if (newPlayingState != isPlayingSwitchState) {
-    isPlayingSwitchState = newPlayingState;
-
-    if (isPlayingSwitchState) {
-
+  // int startStopStart = analogRead(PLAYSTOP_ANALOG_IN);  
+  // bool newPlayingState = (startStopStart > 200);
+  
+  if (btnPlayStop.debounce()) {
+    if ( isPlayingSwitchState == true ) {
+      isPlayingSwitchState = false;
+    }
+    else {
+      isPlayingSwitchState = true;    
       if (isPlaying && shiftIsPressed) {
+        shiftIsPressed = false;
         currentPosition = 0;
       } else {
         setIsPlaying(!isPlaying);
-      }
+      }  
     }
   }
+ // if (newPlayingState != isPlayingSwitchState) {
+  //  isPlayingSwitchState = newPlayingState;
+
+  //  if (isPlayingSwitchState) {
+
+   //   if (isPlaying && shiftIsPressed) {
+   //     shiftIsPressed = false;
+   //     currentPosition = 0;
+   //   } else {
+   //     setIsPlaying(!isPlaying);
+   //   }
+   // }
+  // }
 }
 
 void fill() {
