@@ -93,6 +93,7 @@ bool needsToSendMidiStart = false;
 bool midiThru = false;
 bool transposeMode = false;
 byte currentChannel = 0;
+byte previousChannel = 0;
 
 byte transpose[CHANNEL_COUNT];
 byte baseNote = 60;
@@ -338,7 +339,7 @@ void handleBarCount() {
     currentBarCount = nextBarCount;
     currentSeqLength = currentBarCount * currentStepCount;
 
-    displayIntValue(nextBarCount);
+    // displayIntValue(nextBarCount);
   }
 }
 
@@ -352,7 +353,7 @@ void handleStepCount() {
     currentStepCount = nextStepCount;
     currentSeqLength = currentBarCount * currentStepCount;
 
-    displayIntValue(nextStepCount);
+   // displayIntValue(nextStepCount);
   }
 }
 
@@ -362,7 +363,7 @@ void displayIntValue(int value) {
    for (int i = 0; i < CHANNEL_COUNT; i++) {
      int state = value & b[i];
      //digitalWrite(ledPins[i], (state > 0) ? HIGH : LOW);
-     display.setCursor(i*3,2);
+     display.setCursor(i*10,2);
      if (state > 0) {
         display.print(i);
      }
@@ -390,11 +391,23 @@ void handleTranspose() {
 
 void handleCurrentChannel() {
   bool channelStates[4] = {false, false, false, false};
-  
-  channelStates[0] = digitalRead(CHANNEL_1_PIN) == HIGH;
-  channelStates[1] = digitalRead(CHANNEL_2_PIN) == HIGH;
-  channelStates[2] = digitalRead(CHANNEL_3_PIN) == HIGH;
-  channelStates[3] = digitalRead(CHANNEL_4_PIN) == HIGH;
+
+  if (btn1.debounce()) {
+    channelStates[0] = true;
+  }
+  if (btn2.debounce()) {
+    channelStates[1] = true;
+  }
+  if (btn3.debounce()) {
+    channelStates[2] = true;
+  }
+  if (btn4.debounce()) {
+    channelStates[3] = true;
+  }
+  // channelStates[0] = digitalRead(CHANNEL_1_PIN) == HIGH;
+  // channelStates[1] = digitalRead(CHANNEL_2_PIN) == HIGH;
+  // channelStates[2] = digitalRead(CHANNEL_3_PIN) == HIGH;
+  // channelStates[3] = digitalRead(CHANNEL_4_PIN) == HIGH;
 
   if (shiftIsPressed) {
 
@@ -420,17 +433,19 @@ void handleCurrentChannel() {
     }
   
     if (!delayIsRunning) {
-      for (byte i = 0; i < CHANNEL_COUNT; i++) {
-        bool state = i == (currentChannel); 
-        //digitalWrite(ledPins[i], state ? HIGH : LOW);
-         display.setCursor(i*3,2);
-         if (state == true) {
-            display.print(i);
-         }
-         else {
-            display.print(" ");      
-         }
+      if (currentChannel != previousChannel ) {
+        display.setCursor(0,2);
+        previousChannel = currentChannel;
+        display.print("Current Chan: "); 
+        display.print(currentChannel + 1);
+        display.println(" ");          
       }
+
+      //for (byte i = 0; i < CHANNEL_COUNT; i++) {
+        //bool state = i == (currentChannel); 
+        //digitalWrite(ledPins[i], state ? HIGH : LOW);
+
+      //}
     }
   }
 
