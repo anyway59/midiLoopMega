@@ -4,6 +4,8 @@
 #include <SSD1306AsciiAvrI2c.h>
 #include <SSD1306init.h>
 #include "button.h"
+#include <SimpleRotary.h>
+
 
 #define I2C_ADDRESS 0x3C
 SSD1306AsciiAvrI2c display;
@@ -22,6 +24,8 @@ SSD1306AsciiAvrI2c display;
 #define PLAYSTOP_PIN 10
 #define ROTARY_PUSH_PIN 9
 
+
+
 // #define CHANNEL_4_LED 2
 // #define CHANNEL_3_LED 3
 // #define CHANNEL_1_LED 4 // Yes, I inverted the 1 & 2 LEDS when I built my box :|
@@ -35,6 +39,14 @@ SSD1306AsciiAvrI2c display;
 #define CHANNEL_2_PIN 6 // was 10
 #define CHANNEL_1_PIN 5 // was 11
 
+// Rotary Encoder Inputs
+#define INPUTCLK 3
+#define INPUTDT 4
+
+
+
+#define CONTROLCHECK 250
+
 // #define BEATOUT_LED 12
 
 #define CHANNEL_COUNT 4
@@ -47,6 +59,9 @@ SSD1306AsciiAvrI2c display;
 #define MAX_KEY_PRESSED 10
 
 #define LOOPER_CHANNEL 12
+#define NUMSCREENS 4
+
+const byte BARCOUNTMAX = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX; 
 
 //THIS is for my personal use
 //This will map channel 5,6,7,8 as channel 1,2,3,4 MIDI thru
@@ -62,7 +77,21 @@ Button btn4;
 Button btnShift;
 Button btnErase;
 Button btnPlayStop;
-Button btnRotaryPush;    // rotary encoder push
+// Button btnRotaryPush;    // rotary encoder push
+
+SimpleRotary rotary(INPUTCLK,INPUTDT,ROTARY_PUSH_PIN);
+byte lastDir = 0;
+
+bool btn1Pressed = false;
+bool btn2Pressed = false;
+bool btn3Pressed = false;
+bool btn4Pressed = false;
+bool btnShiftPressed = false;
+bool btnErasePressed = false;
+bool btnPlayStopPressed = false;
+bool btnRotaryPushPressed = false;
+bool rotaryMoved = false;
+bool editMode = false;
 
 
 bool isMuted[4] = {false, false, false, false};
@@ -85,6 +114,8 @@ bool useMidiClock = false;
 
 int currentSeqLength = 16;
 
+unsigned int counter = 0;
+
 bool isPlaying = false;
 bool isPlayingSwitchState = false;
 
@@ -102,6 +133,20 @@ byte currentPosition = 0;
 byte sequence[CHANNEL_COUNT][SEQUENCE_LENGTH_MAX];
 
 byte previousNote[CHANNEL_COUNT];
+
+byte screenNumber = 0; 
+boolean screenChanged = false;
+int currentStateCLK;
+int previousStateCLK;
+
+const char *screenNames[] = {
+     "Tempo",
+     "Bar Count",
+     "Step Count",
+     "Transpose",
+};
+
+float tempo = 120.0;
 
 class ArpState {
   public:
@@ -157,8 +202,12 @@ void clockOutput16PPQN(uint32_t* tick) {
 
   bool isQuarterBeat = (((currentPosition % currentStepCount) % 4) == 0);
   //digitalWrite(BEATOUT_LED, isQuarterBeat); 
-  display.setCursor(0,4);
-  display.print("X");
+ // display.setCursor(112,4);
+ // if ( isQuarterBeat ) {
+ //   display.print("QBT");
+ // }
+
+  
 
   if (!arpIsOn) {
     
@@ -225,6 +274,9 @@ void setup() {
     display.clear();
 
     // buttons
+    pinMode(ROTARY_PUSH_PIN, INPUT_PULLUP);
+    rotary.setDebounceDelay(5);
+    
     btn1.begin(CHANNEL_1_PIN);
     btn2.begin(CHANNEL_2_PIN);
     btn3.begin(CHANNEL_3_PIN);
@@ -232,7 +284,7 @@ void setup() {
     btnShift.begin(SHIFT_PIN);
     btnErase.begin(ERASE_PIN);
     btnPlayStop.begin(PLAYSTOP_PIN);
-    btnRotaryPush.begin(ROTARY_PUSH_PIN); // rotary push
+    //btnRotaryPush.begin(ROTARY_PUSH_PIN); // rotary push
 
     
   //Serial.begin(31250);
@@ -289,18 +341,23 @@ void setup() {
 }
 
 void handleShift() {
-  if (btnShift.debounce()) {
+  if (btnShiftPressed) {
     shiftIsPressed = true;
+    btnShiftPressed = false;
+    display.setCursor(0,6);
+    display.print("SHFT ");
   }
  // int shiftState = analogRead(SHIFT_ANALOG_IN);
  // shiftIsPressed = (shiftState > 200);
+
 }
 
 void handleErase() {
   //int erase = analogRead(ERASE_ANALOG_IN);
 
  // if (erase > 200) {
-    if (btnErase.debounce()) {
+    if (btnErasePressed) {
+      btnErasePressed = false;
       if (!shiftIsPressed) {
         sequence[currentChannel][currentPosition] = 0;
       } else {
@@ -308,6 +365,8 @@ void handleErase() {
           sequence[currentChannel][step] = 0;
         }
         shiftIsPressed = false;
+        display.setCursor(0,6);
+        display.print("    ");
       }
   }
 }
@@ -320,58 +379,27 @@ void eraseAll() {
   }
 }
 
-void handleTempo() {
-  // int tempoPot = analogRead(TEMPO_ANALOG_IN);
-  //float tempo = round(((float)tempoPot/1024.f)*(TEMPO_MAX - TEMPO_MIN) + TEMPO_MIN);
-  float tempo = 120.0;
 
-  uClock.setTempo(tempo);
-}
 
-void handleBarCount() {
-  //int pot = analogRead(BARCOUNT_ANALOG_IN);
-  //byte maxValue = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX;
-  //int nextBarCount = round(((float)pot/1024.f)*(maxValue - 1) + 1);
 
-  int nextBarCount = 1;
-  
-  if (nextBarCount != currentBarCount) {
-    currentBarCount = nextBarCount;
-    currentSeqLength = currentBarCount * currentStepCount;
 
-    // displayIntValue(nextBarCount);
-  }
-}
 
-void handleStepCount() {
-  //int pot = analogRead(STEPCOUNT_ANALOG_IN);
-  //int nextStepCount = round(((float)pot/1024.f)*(STEP_PER_BAR_MAX - 1) + 1);
 
-  int nextStepCount = STEP_PER_BAR_MAX;
+//void displayIntValue(int value) {
+//  int b[4] = {1,2,4,8};
 
-  if (nextStepCount != currentStepCount) {
-    currentStepCount = nextStepCount;
-    currentSeqLength = currentBarCount * currentStepCount;
-
-   // displayIntValue(nextStepCount);
-  }
-}
-
-void displayIntValue(int value) {
-  int b[4] = {1,2,4,8};
-
-   for (int i = 0; i < CHANNEL_COUNT; i++) {
-     int state = value & b[i];
+//   for (int i = 0; i < CHANNEL_COUNT; i++) {
+//     int state = value & b[i];
      //digitalWrite(ledPins[i], (state > 0) ? HIGH : LOW);
-     display.setCursor(i*10,2);
-     if (state > 0) {
-        display.print(i);
-     }
-     else {
-        display.print(" ");      
-     }
-   }
-
+//     display.setCursor(i*10,2);
+ //    if (state > 0) {
+////        display.print(i);
+//     }
+ //    else {
+//        display.print(" ");      
+//     }
+//}
+void delayStuff() {
    delayStart = millis();
    delayIsRunning = true;
 }
@@ -383,35 +411,47 @@ void handleMidiThru() {
   midiThru = false;
 }
 
-void handleTranspose() {
-  // int transposeState = analogRead(TRANSPOSE_ANALOG_IN);
-  // transposeMode = (transposeState > 200);
-  transposeMode = false;
-}
+
 
 void handleCurrentChannel() {
   bool channelStates[4] = {false, false, false, false};
 
-  if (btn1.debounce()) {
+  bool channelButtonPressed = false;
+
+
+
+  if (btn1Pressed) {
     channelStates[0] = true;
+    btn1Pressed = false;
+    channelButtonPressed = true;
   }
-  if (btn2.debounce()) {
+  if (btn2Pressed) {
     channelStates[1] = true;
+    btn2Pressed = false;
+    channelButtonPressed = true;
   }
-  if (btn3.debounce()) {
+  if (btn3Pressed) {
     channelStates[2] = true;
+    btn3Pressed = false;
+    channelButtonPressed = true;
   }
-  if (btn4.debounce()) {
+  if (btn4Pressed) {
     channelStates[3] = true;
+    btn4Pressed = false;
+    channelButtonPressed = true;
   }
   // channelStates[0] = digitalRead(CHANNEL_1_PIN) == HIGH;
   // channelStates[1] = digitalRead(CHANNEL_2_PIN) == HIGH;
   // channelStates[2] = digitalRead(CHANNEL_3_PIN) == HIGH;
   // channelStates[3] = digitalRead(CHANNEL_4_PIN) == HIGH;
 
-  if (shiftIsPressed) {
+  if (channelButtonPressed && shiftIsPressed) {
 
     shiftIsPressed = false;
+
+    display.setCursor(0,6);
+    display.print("    ");
+    
     
     if (channelStates[0] && !fillIsDone) { //FILL MODE
       fill();
@@ -436,7 +476,7 @@ void handleCurrentChannel() {
       if (currentChannel != previousChannel ) {
         display.setCursor(0,2);
         previousChannel = currentChannel;
-        display.print("Current Chan: "); 
+        display.print("SEQ: "); 
         display.print(currentChannel + 1);
         display.println(" ");          
       }
@@ -479,8 +519,8 @@ void setIsPlaying(bool state) {
     // digitalWrite(OUT_GATE, LOW);
     // digitalWrite(OUT_SYNC, LOW);
     //digitalWrite(BEATOUT_LED, LOW); 
-    display.setCursor(0,4);
-    display.print(" ");      
+   // display.setCursor(112,4);
+  //  display.print("    ");     
 
     //delay(20);
     currentPosition = 0;
@@ -491,19 +531,31 @@ void setIsPlaying(bool state) {
 void handleStartStop() {
   // int startStopStart = analogRead(PLAYSTOP_ANALOG_IN);  
   // bool newPlayingState = (startStopStart > 200);
+
+
   
-  if (btnPlayStop.debounce()) {
+  if (btnPlayStopPressed) {
+    btnPlayStopPressed = false;
     if ( isPlayingSwitchState == true ) {
       isPlayingSwitchState = false;
     }
     else {
-      isPlayingSwitchState = true;    
+      isPlayingSwitchState = true;  
+    }
       if (isPlaying && shiftIsPressed) {
         shiftIsPressed = false;
         currentPosition = 0;
       } else {
         setIsPlaying(!isPlaying);
       }  
+    
+    if (isPlaying )  {
+      display.setCursor(64,6);
+      display.print("RNG  ");      
+    }
+    else {
+        display.setCursor(64,6);
+        display.print("    ");      
     }
   }
  // if (newPlayingState != isPlayingSwitchState) {
@@ -532,14 +584,39 @@ void fill() {
 
 void loop() {
 
+  readButtons2();
+  if ((counter % CONTROLCHECK) == 0 ) {
+    readButtons();
+    if ( btnRotaryPushPressed ) {
+      btnRotaryPushPressed = false;
+      editMode = ( ! editMode );
+      if ( screenNumber == 3 ) {
+             transposeMode = ( ! transposeMode );
+             editMode = false;         
+      }
+      screenChanged = true; 
+      updateScreen();
+    }
+    readEncoder();
+
+    if ( rotaryMoved ) {
+      screenChanged = true; 
+      updateScreen();      
+    }
+    counter = 1;
+  }
+  else {
+    counter++;
+  }
+  
   handleShift();
   
-  handleTempo();
-  handleBarCount();
-  handleStepCount();
+  //handleTempo();
+  //handleBarCount();
+  //handleStepCount();
   
   handleMidiThru();
-  handleTranspose();
+  //handleTranspose();
   handleStartStop();
   handleCurrentChannel();
   
@@ -666,3 +743,205 @@ void handleClock() {
   midiTick = midiTick + 1;
   
 }
+
+void readButtons() {
+  if (btn1.debounce()) {
+    btn1Pressed = true;
+  }
+  if (btn2.debounce()) {
+    btn2Pressed = true;
+  }
+  if (btn3.debounce()) {
+    btn3Pressed = true;
+  }
+  if (btn4.debounce()) {
+    btn4Pressed = true;
+  }
+  if (btnShift.debounce()) {
+    btnShiftPressed = true;
+  }
+  if (btnErase.debounce()) {
+    btnErasePressed = true;
+  }
+  if (btnPlayStop.debounce()) {
+    btnPlayStopPressed = true;
+  } 
+  //int switchState = digitalRead(ROTARY_PUSH_PIN);
+  //if (switchState == LOW) {
+  //  btnRotaryPushPressed = true;    
+  //}
+//  if (btnRotaryPush.debounce()) {
+}
+void readButtons2() {
+  //byte i = rotary.pushLong(50);
+  byte i = rotary.pushLong(5);
+  if ( i != 0 ) {
+    btnRotaryPushPressed = true;
+ //display.setCursor(0,5);
+ //display.print(i);
+ //display.print("   ");
+  }
+  
+ // byte t = rotary.pushType(1000);
+//  if ( t != 0  ) {
+ //   btnRotaryPushPressed = true;
+ // }     
+}
+
+void readEncoder() {
+    // Read the current state of inputCLK
+    rotaryMoved = false;
+
+   int delta = 0; 
+
+  int rDir = rotary.rotate();
+
+  // Check direction
+  if ( rDir == 1  ) {
+      // CW
+      delta = 1;  
+      lastDir = rDir;
+  }
+  if ( rDir == 2 ) {
+      // CCW
+      delta = -1; 
+      lastDir = rDir;
+  }
+
+  
+  // currentStateCLK = digitalRead(INPUTCLK);
+    
+   // If the previous and the current state of the inputCLK are different then a pulse has occured
+   //if (currentStateCLK != previousStateCLK){ 
+   if ( delta != 0 ) {
+     rotaryMoved = true;
+     // If the inputDT state is different than the inputCLK state then 
+     // the encoder is rotating counterclockwise
+    // if (digitalRead(INPUTDT) != currentStateCLK) { 
+    //   delta = -1; 
+    // } else {
+       // Encoder is rotating clockwise
+   //    delta = 1;        
+   //  }
+     if ( ! editMode ) {
+             screenNumber = screenNumber + delta;
+             screenNumber = (screenNumber % NUMSCREENS);
+             screenChanged = true;       
+     }
+     else {
+        switch ( screenNumber )  {
+          case 0:    // TEMPO
+             tempo = tempo + delta;
+             if ( tempo > TEMPO_MAX ) tempo = TEMPO_MAX;
+             if ( tempo < TEMPO_MIN ) tempo = TEMPO_MIN;
+             uClock.setTempo(tempo);
+             screenChanged = true;  
+             updateScreen();          
+             break;
+          case 1:    // BAR COUNT
+             currentBarCount = currentBarCount + delta;
+             if ( currentBarCount > BARCOUNTMAX ) currentBarCount = BARCOUNTMAX;
+             if ( currentBarCount < 1 ) currentBarCount = 1;
+             currentSeqLength = currentBarCount * currentStepCount;
+             delayStuff();
+             screenChanged = true; 
+             updateScreen();                        
+             break;
+          case 2:    // STEP COUNT
+             currentStepCount = currentStepCount + delta;
+             if ( currentStepCount > STEP_PER_BAR_MAX ) currentStepCount = STEP_PER_BAR_MAX;
+             if ( currentStepCount < 1 ) currentStepCount = 1;
+             currentSeqLength = currentBarCount * currentStepCount;
+             delayStuff();
+             screenChanged = true;  
+             updateScreen();          
+             break;
+          case 3:    // TRANSPOSE
+            break;   
+       //      transposeMode = ( ! transposeMode );
+       //      editMode = false; 
+
+       //      screenChanged = true; 
+        //     updateScreen();           
+         //break;                                    
+        }
+
+     }
+   }
+   // Update previousStateCLK with the current state
+   // previousStateCLK = currentStateCLK;
+}
+
+void updateScreen() {
+     if ( screenChanged ) {
+      display.setCursor(0,0);
+      display.print(screenNames[screenNumber]);
+      if ( editMode ) {
+        display.print("(edit): ");
+      }
+      else {
+        display.print("      : ");
+      }
+         switch ( screenNumber )  {
+          case 0:    // TEMPO
+             display.print(tempo);           
+             break;
+          case 1:    // BAR COUNT
+             display.print(currentBarCount);  
+             break;
+          case 2:    // STEP COUNT
+             display.print(currentStepCount);  
+             break;
+          case 3:    // TRANSPOSE
+             display.print(transposeMode);  
+                    
+             break;           
+        }
+      display.println("     ");
+      //display.setCursor(0,3);
+      //display.println(screenNumber);
+     }
+     screenChanged = false;
+}
+
+//void handleTranspose() {
+  // int transposeState = analogRead(TRANSPOSE_ANALOG_IN);
+  // transposeMode = (transposeState > 200);
+//  transposeMode = false;
+//}
+
+//void handleStepCount() {
+  //int pot = analogRead(STEPCOUNT_ANALOG_IN);
+  //int nextStepCount = round(((float)pot/1024.f)*(STEP_PER_BAR_MAX - 1) + 1);
+
+//  int nextStepCount = STEP_PER_BAR_MAX;
+
+//if (nextStepCount != currentStepCount) {
+//    currentStepCount = nextStepCount;
+ //   currentSeqLength = currentBarCount * currentStepCount;
+
+   // displayIntValue(nextStepCount);
+//  }
+//}
+
+// void handleBarCount() {
+  //int pot = analogRead(BARCOUNT_ANALOG_IN);
+  //byte maxValue = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX;    128/16 = 8    BARCOUNTMAX
+  //int nextBarCount = round(((float)pot/1024.f)*(maxValue - 1) + 1);  minimum 1   max 8
+
+  // int nextBarCount = 1;
+  
+ //  if (nextBarCount != currentBarCount) {
+   //  currentBarCount = nextBarCount;
+   // currentSeqLength = currentBarCount * currentStepCount;
+
+    // displayIntValue(nextBarCount);
+ // }
+// }
+//void handleTempo() {
+  // int tempoPot = analogRead(TEMPO_ANALOG_IN);
+  //float tempo = round(((float)tempoPot/1024.f)*(TEMPO_MAX - TEMPO_MIN) + TEMPO_MIN);
+  //float tempo = 120.0;
+
+  //uClock.setTempo(tempo);
+//}
