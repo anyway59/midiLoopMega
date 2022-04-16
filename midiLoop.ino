@@ -4,7 +4,6 @@
 #include <SSD1306AsciiAvrI2c.h>
 #include <SSD1306init.h>
 #include "button.h"
-#include <SimpleRotary.h>
 
 
 #define I2C_ADDRESS 0x3C
@@ -22,7 +21,7 @@ SSD1306AsciiAvrI2c display;
 #define SHIFT_PIN 12 
 #define ERASE_PIN 11
 #define PLAYSTOP_PIN 10
-#define ROTARY_PUSH_PIN 9
+#define SELECT_PIN 9
 
 
 
@@ -77,9 +76,9 @@ Button btn4;
 Button btnShift;
 Button btnErase;
 Button btnPlayStop;
-// Button btnRotaryPush;    // rotary encoder push
+Button btnSelect;    
 
-SimpleRotary rotary(INPUTCLK,INPUTDT,ROTARY_PUSH_PIN);
+
 byte lastDir = 0;
 
 bool btn1Pressed = false;
@@ -89,7 +88,7 @@ bool btn4Pressed = false;
 bool btnShiftPressed = false;
 bool btnErasePressed = false;
 bool btnPlayStopPressed = false;
-bool btnRotaryPushPressed = false;
+bool btnSelectPressed = false;
 bool rotaryMoved = false;
 bool editMode = false;
 
@@ -274,8 +273,8 @@ void setup() {
     display.clear();
 
     // buttons
-    pinMode(ROTARY_PUSH_PIN, INPUT_PULLUP);
-    rotary.setDebounceDelay(5);
+    //pinMode(SELECT_PIN, INPUT_PULLUP);
+
     
     btn1.begin(CHANNEL_1_PIN);
     btn2.begin(CHANNEL_2_PIN);
@@ -284,7 +283,7 @@ void setup() {
     btnShift.begin(SHIFT_PIN);
     btnErase.begin(ERASE_PIN);
     btnPlayStop.begin(PLAYSTOP_PIN);
-    //btnRotaryPush.begin(ROTARY_PUSH_PIN); // rotary push
+    btnSelect.begin(SELECT_PIN); 
 
     
   //Serial.begin(31250);
@@ -584,11 +583,11 @@ void fill() {
 
 void loop() {
 
-  readButtons2();
+
   if ((counter % CONTROLCHECK) == 0 ) {
     readButtons();
-    if ( btnRotaryPushPressed ) {
-      btnRotaryPushPressed = false;
+    if ( btnSelectPressed ) {
+      btnSelectPressed = false;
       editMode = ( ! editMode );
       if ( screenNumber == 3 ) {
              transposeMode = ( ! transposeMode );
@@ -766,27 +765,11 @@ void readButtons() {
   if (btnPlayStop.debounce()) {
     btnPlayStopPressed = true;
   } 
-  //int switchState = digitalRead(ROTARY_PUSH_PIN);
-  //if (switchState == LOW) {
-  //  btnRotaryPushPressed = true;    
-  //}
-//  if (btnRotaryPush.debounce()) {
+ if (btnSelect.debounce()) {
+   btnSelectPressed = true;    
+ }
 }
-void readButtons2() {
-  //byte i = rotary.pushLong(50);
-  byte i = rotary.pushLong(5);
-  if ( i != 0 ) {
-    btnRotaryPushPressed = true;
- //display.setCursor(0,5);
- //display.print(i);
- //display.print("   ");
-  }
-  
- // byte t = rotary.pushType(1000);
-//  if ( t != 0  ) {
- //   btnRotaryPushPressed = true;
- // }     
-}
+
 
 void readEncoder() {
     // Read the current state of inputCLK
@@ -794,35 +777,22 @@ void readEncoder() {
 
    int delta = 0; 
 
-  int rDir = rotary.rotate();
 
-  // Check direction
-  if ( rDir == 1  ) {
-      // CW
-      delta = 1;  
-      lastDir = rDir;
-  }
-  if ( rDir == 2 ) {
-      // CCW
-      delta = -1; 
-      lastDir = rDir;
-  }
 
   
-  // currentStateCLK = digitalRead(INPUTCLK);
+  currentStateCLK = digitalRead(INPUTCLK);
     
    // If the previous and the current state of the inputCLK are different then a pulse has occured
-   //if (currentStateCLK != previousStateCLK){ 
-   if ( delta != 0 ) {
+   if (currentStateCLK != previousStateCLK){ 
      rotaryMoved = true;
      // If the inputDT state is different than the inputCLK state then 
      // the encoder is rotating counterclockwise
-    // if (digitalRead(INPUTDT) != currentStateCLK) { 
-    //   delta = -1; 
-    // } else {
+    if (digitalRead(INPUTDT) != currentStateCLK) { 
+       delta = -1; 
+    } else {
        // Encoder is rotating clockwise
-   //    delta = 1;        
-   //  }
+       delta = 1;        
+    }
      if ( ! editMode ) {
              screenNumber = screenNumber + delta;
              screenNumber = (screenNumber % NUMSCREENS);
@@ -869,7 +839,7 @@ void readEncoder() {
      }
    }
    // Update previousStateCLK with the current state
-   // previousStateCLK = currentStateCLK;
+    previousStateCLK = currentStateCLK;
 }
 
 void updateScreen() {
@@ -893,7 +863,14 @@ void updateScreen() {
              display.print(currentStepCount);  
              break;
           case 3:    // TRANSPOSE
-             display.print(transposeMode);  
+             if (transposeMode) {
+                display.print("ON  ");
+             }
+             else
+             {
+                display.print("OFF ");              
+             }
+               
                     
              break;           
         }
@@ -904,44 +881,4 @@ void updateScreen() {
      screenChanged = false;
 }
 
-//void handleTranspose() {
-  // int transposeState = analogRead(TRANSPOSE_ANALOG_IN);
-  // transposeMode = (transposeState > 200);
-//  transposeMode = false;
-//}
 
-//void handleStepCount() {
-  //int pot = analogRead(STEPCOUNT_ANALOG_IN);
-  //int nextStepCount = round(((float)pot/1024.f)*(STEP_PER_BAR_MAX - 1) + 1);
-
-//  int nextStepCount = STEP_PER_BAR_MAX;
-
-//if (nextStepCount != currentStepCount) {
-//    currentStepCount = nextStepCount;
- //   currentSeqLength = currentBarCount * currentStepCount;
-
-   // displayIntValue(nextStepCount);
-//  }
-//}
-
-// void handleBarCount() {
-  //int pot = analogRead(BARCOUNT_ANALOG_IN);
-  //byte maxValue = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX;    128/16 = 8    BARCOUNTMAX
-  //int nextBarCount = round(((float)pot/1024.f)*(maxValue - 1) + 1);  minimum 1   max 8
-
-  // int nextBarCount = 1;
-  
- //  if (nextBarCount != currentBarCount) {
-   //  currentBarCount = nextBarCount;
-   // currentSeqLength = currentBarCount * currentStepCount;
-
-    // displayIntValue(nextBarCount);
- // }
-// }
-//void handleTempo() {
-  // int tempoPot = analogRead(TEMPO_ANALOG_IN);
-  //float tempo = round(((float)tempoPot/1024.f)*(TEMPO_MAX - TEMPO_MIN) + TEMPO_MIN);
-  //float tempo = 120.0;
-
-  //uClock.setTempo(tempo);
-//}
