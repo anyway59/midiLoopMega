@@ -1,4 +1,4 @@
-e#include <uClock.h>
+#include <uClock.h>
 #include <MIDI.h>
 #include <SSD1306Ascii.h>
 #include <SSD1306AsciiAvrI2c.h>
@@ -58,13 +58,13 @@ SSD1306AsciiAvrI2c display;
 #define MAX_KEY_PRESSED 10
 
 #define LOOPER_CHANNEL 12
-#define NUMSCREENS 4
+#define NUMSCREENS 5
 
 const byte BARCOUNTMAX = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX; 
 
 //THIS is for my personal use
 //This will map channel 5,6,7,8 as channel 1,2,3,4 MIDI thru
-#define USE_MIDI_THRU_CHANNELS 1
+#define USE_MIDI_THRU_CHANNELS 0   // disabled
 
 //byte ledPins[4] = {CHANNEL_1_LED, CHANNEL_2_LED, CHANNEL_3_LED, CHANNEL_4_LED};
 
@@ -143,6 +143,7 @@ const char *screenNames[] = {
      "Bar Count",
      "Step Count",
      "Transpose",
+     "Midi Thru",
 };
 
 float tempo = 120.0;
@@ -383,32 +384,13 @@ void eraseAll() {
 
 
 
-
-//void displayIntValue(int value) {
-//  int b[4] = {1,2,4,8};
-
-//   for (int i = 0; i < CHANNEL_COUNT; i++) {
-//     int state = value & b[i];
-     //digitalWrite(ledPins[i], (state > 0) ? HIGH : LOW);
-//     display.setCursor(i*10,2);
- //    if (state > 0) {
-////        display.print(i);
-//     }
- //    else {
-//        display.print(" ");      
-//     }
-//}
 void delayStuff() {
    delayStart = millis();
    delayIsRunning = true;
 }
 
 
-void handleMidiThru() {
- // int midiThruState = analogRead(MIDITHRU_ANALOG_IN);
- // midiThru = (midiThruState > 200);
-  midiThru = false;
-}
+
 
 
 
@@ -593,6 +575,10 @@ void loop() {
              transposeMode = ( ! transposeMode );
              editMode = false;         
       }
+      if ( screenNumber == 4 ) {
+             midiThru = ( ! midiThru );
+             editMode = false;         
+      }
       screenChanged = true; 
       updateScreen();
     }
@@ -614,7 +600,7 @@ void loop() {
   //handleBarCount();
   //handleStepCount();
   
-  handleMidiThru();
+  // handleMidiThru();
   //handleTranspose();
   handleStartStop();
   handleCurrentChannel();
@@ -827,7 +813,9 @@ void readEncoder() {
              updateScreen();          
              break;
           case 3:    // TRANSPOSE
-            break;   
+            break; 
+          case 4:    // MIDITHRU
+            break;    
        //      transposeMode = ( ! transposeMode );
        //      editMode = false; 
 
@@ -869,9 +857,15 @@ void updateScreen() {
              else
              {
                 display.print("OFF ");              
+             }   
+          case 4:    // Midi Thru
+             if (midiThru) {
+                display.print("ON  ");
              }
-               
-                    
+             else
+             {
+                display.print("OFF ");              
+             }   //midiThru                             
              break;           
         }
       display.println("     ");
