@@ -23,6 +23,10 @@ SSD1306AsciiAvrI2c display;
 #define PLAYSTOP_PIN 10
 #define SELECT_PIN 9
 
+#define VKEYSMIDI 1   // Volca Keys at Midi Channel 1
+#define SEQ4MIDI 2   // 4th Sequence at Midi Channel 2
+#define VBASSMIDI 4   // Volca Bass at Midi Channel 4
+
 
 
 // #define CHANNEL_4_LED 2
@@ -58,7 +62,7 @@ SSD1306AsciiAvrI2c display;
 #define MAX_KEY_PRESSED 10
 
 #define LOOPER_CHANNEL 12
-#define NUMSCREENS 5
+
 
 const byte BARCOUNTMAX = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX; 
 
@@ -94,7 +98,7 @@ bool editMode = false;
 
 
 bool isMuted[4] = {false, false, false, false};
-byte seqChannels[4] = { 0, 0, 0, 1 };
+byte seqChannels[4] = { VKEYSMIDI, VKEYSMIDI, VKEYSMIDI, SEQ4MIDI };
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -116,6 +120,7 @@ int currentSeqLength = 16;
 
 unsigned int counter = 0;
 
+
 bool isPlaying = false;
 bool isPlayingSwitchState = false;
 
@@ -124,11 +129,14 @@ bool needsToSendMidiStart = false;
 bool midiThru = false;
 bool transposeMode = false;
 bool transposeAll = false;
+bool transposeVB = true;
 byte currentChannel = 0;
 byte previousChannel = 0;
 
 byte transpose[CHANNEL_COUNT];
 byte baseNote = 60;
+byte vbPitch = 0;
+byte lastvbPitch = 0;
 
 byte currentPosition = 0;
 byte sequence[CHANNEL_COUNT][SEQUENCE_LENGTH_MAX];
@@ -145,8 +153,11 @@ const char *screenNames[] = {
      "Bar Count",
      "Step Count",
      "Transpose",
+     "Trans VB",
      "Midi Thru",
 };
+
+#define NUMSCREENS 6
 
 float tempo = 120.0;
 
@@ -215,7 +226,7 @@ void clockOutput16PPQN(uint32_t* tick) {
     
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
       if (previousNote[channel] > 0) {
-          MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] + 1);
+          MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] );
           previousNote[channel] = 0;
       }
 
@@ -224,14 +235,14 @@ void clockOutput16PPQN(uint32_t* tick) {
       if (currentNote > 0 && !isMuted[channel]) {
           currentNote += transpose[channel];
         
-          MIDI.sendNoteOn(currentNote, 127, seqChannels[channel] + 1);
+          MIDI.sendNoteOn(currentNote, 127, seqChannels[channel] );
           previousNote[channel] = currentNote;
       }
     }
     
   } else {
     if (previousNote[currentChannel] > 0) {
-       MIDI.sendNoteOn(previousNote[currentChannel], 0, seqChannels[currentChannel] + 1);
+       MIDI.sendNoteOn(previousNote[currentChannel], 0, seqChannels[currentChannel] );
       previousNote[currentChannel] = 0;
     }
 
@@ -241,12 +252,14 @@ void clockOutput16PPQN(uint32_t* tick) {
       // try this
       //note  += transpose[currentChannel];
       
-      MIDI.sendNoteOn(note, 127, seqChannels[currentChannel] + 1);
+      MIDI.sendNoteOn(note, 127, seqChannels[currentChannel] );
       previousNote[currentChannel] = note;
     }
   }
 
   currentPosition = (currentPosition + 1) % currentSeqLength;
+
+
 }
 
 void clockOutput32PPQN(uint32_t* tick) {
@@ -486,7 +499,7 @@ void displaySeqInfo() {
         display.print("SEQ: "); 
         display.print(currentChannel + 1);
         display.print(" mCH: ");
-        display.print(seqChannels[currentChannel] + 1);
+        display.print(seqChannels[currentChannel] );
         display.println(" ");  
 }
 void setIsPlaying(bool state) {
@@ -506,7 +519,7 @@ void setIsPlaying(bool state) {
 
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
       if (previousNote[channel] > 0) {
-        MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] + 1);
+        MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] );
         previousNote[channel] = 0;
       }
     }
@@ -553,19 +566,7 @@ void handleStartStop() {
         display.print("    ");      
     }
   }
- // if (newPlayingState != isPlayingSwitchState) {
-  //  isPlayingSwitchState = newPlayingState;
 
-  //  if (isPlayingSwitchState) {
-
-   //   if (isPlaying && shiftIsPressed) {
-   //     shiftIsPressed = false;
-   //     currentPosition = 0;
-   //   } else {
-   //     setIsPlaying(!isPlaying);
-   //   }
-   // }
-  // }
 }
 
 void fill() {
@@ -576,6 +577,22 @@ void fill() {
   }
   fillIsDone = true;
 }
+
+void sendVbTranspose() {
+      if ( vbPitch != lastvbPitch ) {
+         MIDI.sendControlChange(43, vbPitch, VBASSMIDI);
+         MIDI.sendControlChange(44, vbPitch, VBASSMIDI);
+         MIDI.sendControlChange(45, vbPitch, VBASSMIDI); 
+         lastvbPitch = vbPitch;     
+         display.setCursor(0,5);  
+         display.print("VBCH,P: ");
+         display.print(VBASSMIDI);
+         display.print(","); 
+         display.println(vbPitch);         
+      }
+}
+;
+
 
 void loop() {
 
@@ -603,6 +620,10 @@ void loop() {
              editMode = false;         
       }
       if ( screenNumber == 4 ) {
+             transposeVB = ( ! transposeVB );
+             editMode = false;         
+      }
+      if ( screenNumber == 5 ) {
              midiThru = ( ! midiThru );
              editMode = false;         
       }
@@ -634,6 +655,9 @@ void loop() {
   
   handleErase();
 
+
+
+
   if ((millis() - delayStart) >= 2000 && delayIsRunning) {
     delayIsRunning = false;
   }
@@ -664,7 +688,20 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
     if (midiThru) {
       MIDI.sendNoteOn(note, velocity, channel);
     } else {
+
       if (transposeMode) {
+       if ( transposeVB ) {
+
+
+         if ( ((note - baseNote) % 12) == 0 ) {
+           vbPitch = 64;
+          } else {
+           vbPitch = 114 + ((note - baseNote) % 12);
+         } 
+         sendVbTranspose();
+ 
+      
+      }
        if ( transposeAll ) {
            for (byte eachChannel = 0; eachChannel < CHANNEL_COUNT; eachChannel++) {    
               transpose[eachChannel] = note - baseNote;
@@ -686,6 +723,8 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
     }
   }
 }
+
+
 
 void handleNoteOff(byte channel, byte note, byte velocity) {
   
@@ -849,8 +888,10 @@ void readEncoder() {
              break;
           case 3:    // TRANSPOSE
             break; 
-          case 4:    // MIDITHRU
-            break;    
+          case 4:    // Transpose VB
+            break; 
+          case 5:    // MIDITHRU
+            break;   
        //      transposeMode = ( ! transposeMode );
        //      editMode = false; 
 
@@ -896,8 +937,17 @@ void updateScreen() {
              else
              {
                 display.print("OFF    ");              
-             }   
-          case 4:    // Midi Thru
+             }    
+          case 4:    // Transpose VB
+             if (transposeVB) {
+                display.print("ON   ");
+             }
+             else
+             {
+                display.print("OFF  ");              
+             }                               
+             break;
+          case 5:    // Midi Thru
              if (midiThru) {
                 display.print("ON   ");
              }
@@ -905,7 +955,7 @@ void updateScreen() {
              {
                 display.print("OFF  ");              
              }   //midiThru                             
-             break;           
+             break;          
         }
       display.println("     ");
       //display.setCursor(0,3);
