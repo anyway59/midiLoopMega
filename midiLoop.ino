@@ -94,6 +94,7 @@ bool editMode = false;
 
 
 bool isMuted[4] = {false, false, false, false};
+byte seqChannels[4] = { 0, 0, 0, 1 };
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -122,6 +123,7 @@ bool needsToSendMidiStart = false;
 
 bool midiThru = false;
 bool transposeMode = false;
+bool transposeAll = false;
 byte currentChannel = 0;
 byte previousChannel = 0;
 
@@ -213,7 +215,7 @@ void clockOutput16PPQN(uint32_t* tick) {
     
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
       if (previousNote[channel] > 0) {
-          MIDI.sendNoteOn(previousNote[channel], 0, channel + 1);
+          MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] + 1);
           previousNote[channel] = 0;
       }
 
@@ -222,20 +224,24 @@ void clockOutput16PPQN(uint32_t* tick) {
       if (currentNote > 0 && !isMuted[channel]) {
           currentNote += transpose[channel];
         
-          MIDI.sendNoteOn(currentNote, 127, channel + 1);
+          MIDI.sendNoteOn(currentNote, 127, seqChannels[channel] + 1);
           previousNote[channel] = currentNote;
       }
     }
     
   } else {
     if (previousNote[currentChannel] > 0) {
-       MIDI.sendNoteOn(previousNote[currentChannel], 0, currentChannel + 1);
+       MIDI.sendNoteOn(previousNote[currentChannel], 0, seqChannels[currentChannel] + 1);
       previousNote[currentChannel] = 0;
     }
 
     if (arpState.count > 0) {
       byte note = arpState.getNote();
-      MIDI.sendNoteOn(note, 127, currentChannel + 1);
+
+      // try this
+      //note  += transpose[currentChannel];
+      
+      MIDI.sendNoteOn(note, 127, seqChannels[currentChannel] + 1);
       previousNote[currentChannel] = note;
     }
   }
@@ -267,10 +273,11 @@ void setup() {
     display.setFont(Adafruit5x7);
     display.clear();
     
-    display.set1X();
+    display.set2X();
     display.println("");
-    display.println("MIDILOOP TEST");
+    display.println("MIDILOOPER");
     delay(3000);
+    display.set1X();
     display.clear();
 
     // buttons
@@ -338,6 +345,7 @@ void setup() {
   MIDI.begin(MIDI_CHANNEL_OMNI);
 
   MIDI.turnThruOff();
+  displaySeqInfo();
 }
 
 void handleShift() {
@@ -455,11 +463,8 @@ void handleCurrentChannel() {
   
     if (!delayIsRunning) {
       if (currentChannel != previousChannel ) {
-        display.setCursor(0,2);
-        previousChannel = currentChannel;
-        display.print("SEQ: "); 
-        display.print(currentChannel + 1);
-        display.println(" ");          
+        displaySeqInfo();
+        previousChannel = currentChannel;   
       }
 
       //for (byte i = 0; i < CHANNEL_COUNT; i++) {
@@ -475,6 +480,15 @@ void handleCurrentChannel() {
   }
 }
 
+
+void displaySeqInfo() {
+        display.setCursor(0,2); 
+        display.print("SEQ: "); 
+        display.print(currentChannel + 1);
+        display.print(" mCH: ");
+        display.print(seqChannels[currentChannel] + 1);
+        display.println(" ");  
+}
 void setIsPlaying(bool state) {
   isPlaying = state;
   
@@ -492,7 +506,7 @@ void setIsPlaying(bool state) {
 
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
       if (previousNote[channel] > 0) {
-        MIDI.sendNoteOn(previousNote[channel], 0, channel + 1);
+        MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] + 1);
         previousNote[channel] = 0;
       }
     }
@@ -572,7 +586,20 @@ void loop() {
       btnSelectPressed = false;
       editMode = ( ! editMode );
       if ( screenNumber == 3 ) {
-             transposeMode = ( ! transposeMode );
+        // transposeMode = ( ! transposeMode );
+             if ( transposeMode ) {
+              if ( ! transposeAll ) {
+                transposeAll = true;
+              }
+              else {
+                transposeMode = false;
+                transposeAll = false;
+              }
+             }
+             else {
+              transposeMode = true;
+              transposeAll = false;
+             }
              editMode = false;         
       }
       if ( screenNumber == 4 ) {
@@ -638,7 +665,15 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
       MIDI.sendNoteOn(note, velocity, channel);
     } else {
       if (transposeMode) {
-        transpose[currentChannel] = note - baseNote;
+       if ( transposeAll ) {
+           for (byte eachChannel = 0; eachChannel < CHANNEL_COUNT; eachChannel++) {    
+              transpose[eachChannel] = note - baseNote;
+           }
+        }
+        else 
+        {
+           transpose[currentChannel] = note - baseNote;
+        }
         
       } else {
         
@@ -835,10 +870,10 @@ void updateScreen() {
       display.setCursor(0,0);
       display.print(screenNames[screenNumber]);
       if ( editMode ) {
-        display.print("(edit): ");
+        display.print("(ed): ");
       }
       else {
-        display.print("      : ");
+        display.print("    : ");
       }
          switch ( screenNumber )  {
           case 0:    // TEMPO
@@ -852,19 +887,23 @@ void updateScreen() {
              break;
           case 3:    // TRANSPOSE
              if (transposeMode) {
-                display.print("ON  ");
+                if ( transposeAll ) {
+                   display.print("ALL     ");
+                } else {
+                   display.print("ON    ");                 
+                }    
              }
              else
              {
-                display.print("OFF ");              
+                display.print("OFF    ");              
              }   
           case 4:    // Midi Thru
              if (midiThru) {
-                display.print("ON  ");
+                display.print("ON   ");
              }
              else
              {
-                display.print("OFF ");              
+                display.print("OFF  ");              
              }   //midiThru                             
              break;           
         }
