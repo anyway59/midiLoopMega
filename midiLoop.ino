@@ -35,7 +35,7 @@ SSD1306AsciiAvrI2c display;
 // #define CHANNEL_2_LED 5
 
 // #define OUT_GATE 6
-// #define OUT_SYNC 7
+#define OUT_SYNC 2
 
 #define CHANNEL_4_PIN 8  // was 8
 #define CHANNEL_3_PIN 7 // was 9
@@ -269,7 +269,7 @@ void clockOutput32PPQN(uint32_t* tick) {
   }
   
   // digitalWrite(OUT_GATE, (*tick % 2) == 0 ? HIGH : LOW);
-  // digitalWrite(OUT_SYNC, (*tick % 4) < 2 ? HIGH : LOW);
+  digitalWrite(OUT_SYNC, (*tick % 4) < 2 ? HIGH : LOW);
 }
 
 void clockOutput96PPQN(uint32_t* tick) {
@@ -342,7 +342,7 @@ void setup() {
   //pinMode(BEATOUT_LED, OUTPUT);
 
   // pinMode(OUT_GATE, OUTPUT);
-  // pinMode(OUT_SYNC, OUTPUT);
+  pinMode(OUT_SYNC, OUTPUT);
 
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -525,7 +525,7 @@ void setIsPlaying(bool state) {
     }
         
     // digitalWrite(OUT_GATE, LOW);
-    // digitalWrite(OUT_SYNC, LOW);
+    digitalWrite(OUT_SYNC, LOW);
     //digitalWrite(BEATOUT_LED, LOW); 
    // display.setCursor(112,4);
   //  display.print("    ");     
@@ -931,12 +931,12 @@ void updateScreen() {
                 if ( transposeAll ) {
                    display.print("ALL     ");
                 } else {
-                   display.print("ON    ");                 
+                   display.print("ON     ");                 
                 }    
              }
              else
              {
-                display.print("OFF    ");              
+                display.print("OFF     ");              
              }    
           case 4:    // Transpose VB
              if (transposeVB) {
