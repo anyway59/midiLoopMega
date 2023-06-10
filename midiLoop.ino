@@ -35,7 +35,8 @@ SSD1306AsciiAvrI2c display;
 // #define CHANNEL_2_LED 5
 
 // #define OUT_GATE 6
-#define OUT_SYNC 2
+#define OUT_ASYNC 2
+#define OUT_BSYNC 13
 
 #define CHANNEL_4_PIN 8  // was 8
 #define CHANNEL_3_PIN 7 // was 9
@@ -58,6 +59,9 @@ SSD1306AsciiAvrI2c display;
 
 #define TEMPO_MIN 30
 #define TEMPO_MAX 200
+
+#define SYNCFACTOR_MIN 1
+#define SYNCFACTOR_MAX 32
 
 #define MAX_KEY_PRESSED 10
 
@@ -120,6 +124,8 @@ int currentSeqLength = 16;
 
 unsigned int counter = 0;
 
+bool syncAstate = false;
+bool syncBstate = false;
 
 bool isPlaying = false;
 bool isPlayingSwitchState = false;
@@ -149,15 +155,22 @@ int currentStateCLK;
 int previousStateCLK;
 
 const char *screenNames[] = {
-     "Tempo",
+     "Tempo    ",
      "Bar Count",
-     "Step Count",
+     "StepCount",
      "Transpose",
      "Trans VB",
-     "Midi Thru",
+     "MidiThru",
+     "Sync A  ",
+     "Sync B  "
 };
 
-#define NUMSCREENS 6
+#define NUMSCREENS 8
+
+int syncAFactor = 6;
+int syncBFactor = 2;
+
+int delta = 0; 
 
 float tempo = 120.0;
 
@@ -267,10 +280,14 @@ void clockOutput32PPQN(uint32_t* tick) {
   if (!isPlaying) {
     return;
   }
+
+  //if ((*tick % syncAFactor) == 0) {
+  // toggleSyncAState();
+  //}
   
-  // digitalWrite(OUT_GATE, (*tick % 2) == 0 ? HIGH : LOW);
-  digitalWrite(OUT_SYNC, (*tick % 4) < 2 ? HIGH : LOW);
 }
+
+
 
 void clockOutput96PPQN(uint32_t* tick) {
   if (needsToSendMidiStart) {
@@ -278,6 +295,16 @@ void clockOutput96PPQN(uint32_t* tick) {
     Serial.write(0xFA);
   }
   Serial.write(0xF8);
+  if (!isPlaying) {
+    return;
+  }
+
+  if ((*tick % syncAFactor) == 0) {
+   toggleSyncAState();
+  }
+  if ((*tick % syncBFactor) == 0) {
+   toggleSyncBState();
+  }
 }
 
 void setup() {
@@ -290,7 +317,7 @@ void setup() {
     display.println("");
     display.println("MIDILOOPER");
     delay(3000);
-    display.set1X();
+    //display.set1X();
     display.clear();
 
     // buttons
@@ -315,7 +342,7 @@ void setup() {
   uClock.setClock32PPQNOutput(clockOutput32PPQN);
   uClock.setClock96PPQNOutput(clockOutput96PPQN);
 
-  uClock.setTempo(96);
+  uClock.setTempo(120);
   uClock.start();
 
   for (size_t i = 0; i < SEQUENCE_LENGTH_MAX; i++) {
@@ -342,7 +369,8 @@ void setup() {
   //pinMode(BEATOUT_LED, OUTPUT);
 
   // pinMode(OUT_GATE, OUTPUT);
-  pinMode(OUT_SYNC, OUTPUT);
+  pinMode(OUT_ASYNC, OUTPUT);
+  pinMode(OUT_BSYNC, OUTPUT);
 
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -365,8 +393,8 @@ void handleShift() {
   if (btnShiftPressed) {
     shiftIsPressed = true;
     btnShiftPressed = false;
-    display.setCursor(0,6);
-    display.print("SHFT ");
+    display.setCursor(86,3);
+    display.print(" # ");
   }
  // int shiftState = analogRead(SHIFT_ANALOG_IN);
  // shiftIsPressed = (shiftState > 200);
@@ -386,7 +414,7 @@ void handleErase() {
           sequence[currentChannel][step] = 0;
         }
         shiftIsPressed = false;
-        display.setCursor(0,6);
+        display.setCursor(86,3);
         display.print("    ");
       }
   }
@@ -451,7 +479,7 @@ void handleCurrentChannel() {
 
     shiftIsPressed = false;
 
-    display.setCursor(0,6);
+    display.setCursor(86,3);
     display.print("    ");
     
     
@@ -495,10 +523,10 @@ void handleCurrentChannel() {
 
 
 void displaySeqInfo() {
-        display.setCursor(0,2); 
-        display.print("SEQ: "); 
+        display.setCursor(0,6); 
+        display.print("S:"); 
         display.print(currentChannel + 1);
-        display.print(" mCH: ");
+        display.print(" M:");
         display.print(seqChannels[currentChannel] );
         display.println(" ");  
 }
@@ -525,7 +553,8 @@ void setIsPlaying(bool state) {
     }
         
     // digitalWrite(OUT_GATE, LOW);
-    digitalWrite(OUT_SYNC, LOW);
+    digitalWrite(OUT_ASYNC, LOW);
+    digitalWrite(OUT_BSYNC, LOW);
     //digitalWrite(BEATOUT_LED, LOW); 
    // display.setCursor(112,4);
   //  display.print("    ");     
@@ -558,12 +587,12 @@ void handleStartStop() {
       }  
     
     if (isPlaying )  {
-      display.setCursor(64,6);
-      display.print("RNG  ");      
+      display.setCursor(86,6);
+      display.print(" ~ ");      
     }
     else {
-        display.setCursor(64,6);
-        display.print("    ");      
+        display.setCursor(86,6);
+        display.print("   ");      
     }
   }
 
@@ -584,11 +613,11 @@ void sendVbTranspose() {
          MIDI.sendControlChange(44, vbPitch, VBASSMIDI);
          MIDI.sendControlChange(45, vbPitch, VBASSMIDI); 
          lastvbPitch = vbPitch;     
-         display.setCursor(0,5);  
-         display.print("VBCH,P: ");
-         display.print(VBASSMIDI);
-         display.print(","); 
-         display.println(vbPitch);         
+         //display.setCursor(0,5);  
+         //display.print("VBCH,P: ");
+         //display.print(VBASSMIDI);
+         //display.print(","); 
+         //display.println(vbPitch);         
       }
 }
 ;
@@ -788,6 +817,28 @@ void handleStop() {
   useMidiClock = false;
 }
 
+void toggleSyncAState() {
+  if (syncAstate) {
+    syncAstate = false;
+    digitalWrite(OUT_ASYNC, LOW);
+  }
+  else {
+    syncAstate = true;
+    digitalWrite(OUT_ASYNC, HIGH);
+  }
+}
+
+void toggleSyncBState() {
+  if (syncBstate) {
+    syncBstate = false;
+    digitalWrite(OUT_BSYNC, LOW);
+  }
+  else {
+    syncBstate = true;
+    digitalWrite(OUT_BSYNC, HIGH);
+  }
+}
+
 void handleClock() {
  
   if (midiTick % 6 == 0) {
@@ -835,7 +886,7 @@ void readEncoder() {
     // Read the current state of inputCLK
     rotaryMoved = false;
 
-   int delta = 0; 
+   
 
 
 
@@ -848,15 +899,15 @@ void readEncoder() {
      // If the inputDT state is different than the inputCLK state then 
      // the encoder is rotating counterclockwise
     if (digitalRead(INPUTDT) != currentStateCLK) { 
-       delta = -1; 
+       delta = 1; 
     } else {
        // Encoder is rotating clockwise
-       delta = 1;        
+       delta = -1;        
     }
      if ( ! editMode ) {
              screenNumber = screenNumber + delta;
              screenNumber = (screenNumber % NUMSCREENS);
-             screenChanged = true;       
+             screenChanged = true;      
      }
      else {
         switch ( screenNumber )  {
@@ -891,7 +942,21 @@ void readEncoder() {
           case 4:    // Transpose VB
             break; 
           case 5:    // MIDITHRU
-            break;   
+            break;  
+          case 6:    // syncAFactor
+             syncAFactor = syncAFactor + delta;
+             if ( syncAFactor > SYNCFACTOR_MAX ) syncAFactor = SYNCFACTOR_MAX;
+             if ( syncAFactor < SYNCFACTOR_MIN ) syncAFactor = SYNCFACTOR_MIN;
+             screenChanged = true;  
+             updateScreen();          
+             break;  
+          case 7:    // syncBFactor
+             syncBFactor = syncBFactor + delta;
+             if ( syncBFactor > SYNCFACTOR_MAX ) syncBFactor = SYNCFACTOR_MAX;
+             if ( syncBFactor < SYNCFACTOR_MIN ) syncBFactor = SYNCFACTOR_MIN;
+             screenChanged = true;  
+             updateScreen();          
+             break;          
        //      transposeMode = ( ! transposeMode );
        //      editMode = false; 
 
@@ -910,12 +975,9 @@ void updateScreen() {
      if ( screenChanged ) {
       display.setCursor(0,0);
       display.print(screenNames[screenNumber]);
-      if ( editMode ) {
-        display.print("(ed): ");
-      }
-      else {
-        display.print("    : ");
-      }
+      display.print("  ");
+      display.setCursor(0,3);
+
          switch ( screenNumber )  {
           case 0:    // TEMPO
              display.print(tempo);           
@@ -929,15 +991,16 @@ void updateScreen() {
           case 3:    // TRANSPOSE
              if (transposeMode) {
                 if ( transposeAll ) {
-                   display.print("ALL     ");
+                   display.print("ALL    ");
                 } else {
-                   display.print("ON     ");                 
+                   display.print("ON    ");                 
                 }    
              }
              else
              {
-                display.print("OFF     ");              
-             }    
+                display.print("OFF    ");              
+             } 
+             break;   
           case 4:    // Transpose VB
              if (transposeVB) {
                 display.print("ON   ");
@@ -955,9 +1018,21 @@ void updateScreen() {
              {
                 display.print("OFF  ");              
              }   //midiThru                             
-             break;          
+             break;
+          case 6:    // syncAFactor
+             display.print(syncAFactor);           
+             break;    
+          case 7:    // syncBFactor
+             display.print(syncBFactor);           
+             break;         
         }
-      display.println("     ");
+      if ( editMode ) {
+        display.print(" * ");
+      }
+      else {
+        display.print("   ");
+      }
+      display.println("    ");
       //display.setCursor(0,3);
       //display.println(screenNumber);
      }
