@@ -494,9 +494,9 @@ void handleCurrentChannel() {
     if (channelStates[0] && !fillIsDone) { //FILL MODE
       fill();
     }
-    if (channelStates[0]) {
-      fillIsDone = false;
-    }
+    //if (channelStates[0]) {
+    //  fillIsDone = false;
+    //}
 
     if (channelStates[1] && !arpPreviousState) {
       arpIsOn = !arpIsOn;
@@ -607,12 +607,14 @@ void handleStartStop() {
 }
 
 void fill() {
-  for (size_t i = currentSeqLength; i < SEQUENCE_LENGTH_MAX; i++) {
-    for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
-      sequence[channel][i] = sequence[channel][i % currentSeqLength];
+  if ( currentSeqLength > currentStepCount) {
+    for (size_t i = currentSeqLength; i < SEQUENCE_LENGTH_MAX; i++) {
+      for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
+        sequence[channel][i] = sequence[channel][i % currentStepCount];
+      }
     }
+    fillIsDone = true;
   }
-  fillIsDone = true;
 }
 
 void sendVbTranspose() {
