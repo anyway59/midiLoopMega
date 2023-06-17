@@ -151,7 +151,7 @@ byte sequence[CHANNEL_COUNT][SEQUENCE_LENGTH_MAX];
 
 byte previousNote[CHANNEL_COUNT];
 
-byte screenNumber = 0; 
+int screenNumber = 0; 
 boolean screenChanged = false;
 int currentStateCLK;
 int previousStateCLK;
@@ -522,6 +522,7 @@ void handleCurrentChannel() {
 
     if ( screenNumber == 8 && mutesChanged) {
       mutesChanged = false;
+      screenChanged = true;
       updateScreen();
     }
   
@@ -933,6 +934,9 @@ void readEncoder() {
     }
      if ( ! editMode ) {
              screenNumber = screenNumber + delta;
+             if (screenNumber < 0 ){
+                screenNumber = (NUMSCREENS - 1);
+             }
              screenNumber = (screenNumber % NUMSCREENS);
              screenChanged = true;      
      }
