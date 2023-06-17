@@ -488,14 +488,28 @@ void handleCurrentChannel() {
   if (channelButtonPressed && shiftIsPressed) {
 
     shiftIsPressed = false;
-
     display.setCursor(86,3);
     display.print("    ");
-    
-    
-    if (channelStates[0] && !fillIsDone) { //FILL MODE
-      fill();
+
+    if ( currentSeqLength > currentStepCount) {
+
+    fillIsDone = false;
+
+    for (byte channel = 0; channel < 4; channel++) {      
+      if (channelStates[channel] && !fillIsDone) {
+        for (size_t i = currentStepCount; i < currentSeqLength; i++) { 
+          sequence[channel][i] = sequence[channel][i % currentStepCount];  
+        }
+       fillIsDone = true;
+      }
+     }
     }
+     
+
+    
+    //if (channelStates[0] && !fillIsDone) { //FILL MODE
+    //  fill();
+    //}
     //if (channelStates[0]) {
     //  fillIsDone = false;
     //}
