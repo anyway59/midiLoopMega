@@ -100,6 +100,7 @@ bool btnPlayStopPressed = false;
 bool btnSelectPressed = false;
 bool rotaryMoved = false;
 bool editMode = false;
+bool mutesChanged = false;
 
 
 bool isMuted[4] = {false, false, false, false};
@@ -163,10 +164,11 @@ const char *screenNames[] = {
      "Trans VB",
      "MidiThru",
      "Sync A  ",
-     "Sync B  "
+     "Sync B  ",
+     "SEQ MUTE"
 };
 
-#define NUMSCREENS 8
+#define NUMSCREENS 9
 
 int syncAFactor = 12;
 int syncBFactor = 3;
@@ -504,10 +506,23 @@ void handleCurrentChannel() {
     }
     
   } else {
+    mutesChanged = false;
     for (byte i = 0; i < 4; i++) {
+      
       if (channelStates[i]) {
-        currentChannel = i;
+        if ( screenNumber != 8 ) {    //  SEQ MUTE screen
+           currentChannel = i;
+        }
+        else {
+          isMuted[i] = ( !isMuted[i] );   // toggle muted status
+          mutesChanged = true;
+        }
       }
+    }
+
+    if ( screenNumber == 8 && mutesChanged) {
+      mutesChanged = false;
+      updateScreen();
     }
   
     if (!delayIsRunning) {
@@ -640,7 +655,9 @@ void loop() {
     readButtons();
     if ( btnSelectPressed ) {
       btnSelectPressed = false;
-      editMode = ( ! editMode );
+      if ( screenNumber != 8 ) {    // edit mode does not apply for SEQ MUTE screen
+        editMode = ( ! editMode );
+      }
       if ( screenNumber == 3 ) {
         // transposeMode = ( ! transposeMode );
              if ( transposeMode ) {
@@ -966,7 +983,9 @@ void readEncoder() {
              if ( syncBFactor < SYNCFACTOR_MIN ) syncBFactor = SYNCFACTOR_MIN;
              screenChanged = true;  
              updateScreen();          
-             break;          
+             break;    
+          case 8:    // SEQ MUTE screen
+            break;       
        //      transposeMode = ( ! transposeMode );
        //      editMode = false; 
 
@@ -1034,6 +1053,17 @@ void updateScreen() {
              break;    
           case 7:    // syncBFactor
              display.print(syncBFactor);           
+             break; 
+          case 8:    // SEQ MUTE screen
+             for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
+               if (isMuted[channel]) {
+                  display.print("M ");
+               }
+               else {
+                  display.print("- ");
+               }
+             }
+                        
              break;         
         }
       if ( editMode ) {
