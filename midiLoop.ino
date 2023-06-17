@@ -392,10 +392,17 @@ void setup() {
 
 void handleShift() {
   if (btnShiftPressed) {
-    shiftIsPressed = true;
     btnShiftPressed = false;
     display.setCursor(86,3);
-    display.print(" # ");
+    if ( !shiftIsPressed ) {
+       shiftIsPressed = true;
+       display.print(" # ");
+    }
+    else {
+       shiftIsPressed = false;
+       display.print("   ");      
+    }
+
   }
  // int shiftState = analogRead(SHIFT_ANALOG_IN);
  // shiftIsPressed = (shiftState > 200);
