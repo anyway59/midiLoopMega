@@ -24,6 +24,7 @@ SSD1306AsciiAvrI2c display;
 #define SELECT_PIN 9
 
 #define VKEYSMIDI 1   // Volca Keys at Midi Channel 1
+#define SEQ3MIDI 1   // 3rd Sequence at Midi Channel 3
 #define SEQ4MIDI 2   // 4th Sequence at Midi Channel 2
 #define VBASSMIDI 4   // Volca Bass at Midi Channel 4
 
@@ -102,7 +103,7 @@ bool editMode = false;
 
 
 bool isMuted[4] = {false, false, false, false};
-byte seqChannels[4] = { VKEYSMIDI, VKEYSMIDI, VKEYSMIDI, SEQ4MIDI };
+byte seqChannels[4] = { VKEYSMIDI, VKEYSMIDI, SEQ3MIDI, SEQ4MIDI };
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -167,8 +168,8 @@ const char *screenNames[] = {
 
 #define NUMSCREENS 8
 
-int syncAFactor = 6;
-int syncBFactor = 2;
+int syncAFactor = 12;
+int syncBFactor = 3;
 
 int delta = 0; 
 
