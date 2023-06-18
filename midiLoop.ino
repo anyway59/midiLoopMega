@@ -5,6 +5,9 @@
 #include <SSD1306init.h>
 #include "button.h"
 
+// include EEPROM library for saving data
+#include <EEPROM.h>
+
 
 #define I2C_ADDRESS 0x3C
 SSD1306AsciiAvrI2c display;
@@ -111,7 +114,6 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 bool midiThruChannels = (bool)USE_MIDI_THRU_CHANNELS;
 
 bool shiftIsPressed = false;
-bool fillIsDone = false;
 
 unsigned long delayStart = 0;
 bool delayIsRunning = false;
@@ -123,6 +125,9 @@ uint32_t midiTick = 0;
 bool useMidiClock = false;
 
 int currentSeqLength = 16;
+
+byte saveLoad = 0;
+
 
 unsigned int counter = 0;
 
@@ -165,10 +170,11 @@ const char *screenNames[] = {
      "MidiThru",
      "Sync A  ",
      "Sync B  ",
-     "SEQ MUTE"
+     "SEQ MUTE",
+     "SAV/LOAD"
 };
 
-#define NUMSCREENS 9
+#define NUMSCREENS 10
 
 int syncAFactor = 12;
 int syncBFactor = 3;
@@ -491,28 +497,27 @@ void handleCurrentChannel() {
     display.setCursor(86,3);
     display.print("    ");
 
-    if ( currentSeqLength > currentStepCount) {
-
-    fillIsDone = false;
-
-    for (byte channel = 0; channel < 4; channel++) {      
-      if (channelStates[channel] && !fillIsDone) {
+    if ( currentSeqLength > currentStepCount) {   // true only if sequence more than one bar long
+    for (byte channel = 0; channel < 4; channel++) {        // FILL
+      if (channelStates[channel]) {
         for (size_t i = currentStepCount; i < currentSeqLength; i++) { 
           sequence[channel][i] = sequence[channel][i % currentStepCount];  
         }
-       fillIsDone = true;
+      }
+     }
+    } else {  // sequence is one bar long
+     for (byte channel = 0; channel < 4; channel++) {        // RE-ALIGN BY ONE
+      if (channelStates[channel]) {
+        sequence[channel][currentSeqLength - 1] = sequence[channel][0];
+        for (size_t i = 0; i < currentSeqLength - 1; i++) { 
+          sequence[channel][i] = sequence[channel][i + 1];  
+        }
       }
      }
     }
      
 
-    
-    //if (channelStates[0] && !fillIsDone) { //FILL MODE
-    //  fill();
-    //}
-    //if (channelStates[0]) {
-    //  fillIsDone = false;
-    //}
+
 
     if (channelStates[1] && !arpPreviousState) {
       arpIsOn = !arpIsOn;
@@ -636,16 +641,6 @@ void handleStartStop() {
 
 }
 
-void fill() {
-  if ( currentSeqLength > currentStepCount) {
-    for (size_t i = currentSeqLength; i < SEQUENCE_LENGTH_MAX; i++) {
-      for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
-        sequence[channel][i] = sequence[channel][i % currentStepCount];
-      }
-    }
-    fillIsDone = true;
-  }
-}
 
 void sendVbTranspose() {
       if ( vbPitch != lastvbPitch ) {
@@ -725,6 +720,8 @@ void loop() {
   handleCurrentChannel();
   
   handleErase();
+
+  handleSaveLoad();
 
 
 
@@ -881,6 +878,20 @@ void toggleSyncBState() {
   }
 }
 
+void handleSaveLoad() {
+  display.setCursor(0,3);
+  if ( saveLoad == 1 ) {   // SAVE
+    saveSession();
+    display.print("SAVED  "); 
+    display.println(" "); 
+  } else if ( saveLoad == 2 ) {   // LOAD
+    loadSession();
+    display.print("LOADED  "); 
+    display.println(" "); 
+  }
+  saveLoad = 0;
+}
+
 void handleClock() {
  
   if (midiTick % 6 == 0) {
@@ -1003,7 +1014,15 @@ void readEncoder() {
              updateScreen();          
              break;    
           case 8:    // SEQ MUTE screen
-            break;       
+            break; 
+          case 9:    // SAVE / LOAD
+             if ((saveLoad + delta) > 0 && (saveLoad + delta) > 3) {
+                 saveLoad = saveLoad + delta;
+             }
+             delayStuff();
+             screenChanged = true;  
+             updateScreen();                      
+            break;      
        //      transposeMode = ( ! transposeMode );
        //      editMode = false; 
 
@@ -1080,9 +1099,19 @@ void updateScreen() {
                else {
                   display.print("- ");
                }
-             }
-                        
-             break;         
+             }      
+             break;  
+          case 9:    // SAVE / LOAD
+             if (saveLoad == 0) {
+                   display.print("NONE  ");
+                } 
+             else if (saveLoad == 1) {
+                   display.print("SAVE  ");                 
+                }    
+             else if (saveLoad == 2) {
+                   display.print("LOAD  ");                 
+              } 
+             break;        
         }
       if ( editMode ) {
         display.print(" * ");
@@ -1095,4 +1124,39 @@ void updateScreen() {
       //display.println(screenNumber);
      }
      screenChanged = false;
+}
+
+void loadSession() {
+  // Need to load : currentBarCount, currentStepCount, currentSeqLength, and content of sequence array
+  int address = 0;
+  currentBarCount = EEPROM.read(address);
+  address++;
+  currentStepCount = EEPROM.read(address);
+  address++;  
+  currentSeqLength = EEPROM.read(address);
+  address++;  
+  for (byte channel = 0; channel < 4; channel++) {     
+    for (size_t i = 0; i < currentSeqLength; i++) { 
+      sequence[channel][i] = EEPROM.read(address); 
+      address++;
+    }
+
+  }
+}
+
+void saveSession() {
+  // Need to save : currentBarCount, currentStepCount, currentSeqLength, and content of sequence array
+  int address = 0;
+  EEPROM.write(address, currentBarCount);
+  address++;
+  EEPROM.write(address, currentStepCount);
+  address++;  
+  EEPROM.write(address, currentSeqLength);
+  address++; 
+  for (byte channel = 0; channel < 4; channel++) {     
+    for (size_t i = 0; i < currentSeqLength; i++) { 
+      EEPROM.write(address, sequence[channel][i]); 
+      address++;
+    }
+  } 
 }
