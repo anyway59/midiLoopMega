@@ -232,6 +232,13 @@ ArpState arpState;
 bool arpIsOn = false;
 bool arpPreviousState = false;
 
+int freeRam() {
+  extern int __heap_start,*__brkval;
+  int v;
+  return (int)&v - (__brkval == 0  
+    ? (int)&__heap_start : (int) __brkval);  
+}
+
 void clockOutput16PPQN(uint32_t* tick) {
 
   if (!isPlaying) {
@@ -328,6 +335,8 @@ void setup() {
     display.set2X();
     display.println("");
     display.println("MIDILOOPER");
+    display.print(F("SRAM left: "));
+    display.println(freeRam());
     delay(3000);
     //display.set1X();
     display.clear();
