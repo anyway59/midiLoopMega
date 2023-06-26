@@ -176,8 +176,11 @@ const char *screenNames[] = {
 
 #define NUMSCREENS 10
 
-int syncAFactor = 12;
-int syncBFactor = 3;
+char syncAFactor = 12;
+char syncBFactor = 3;
+
+char syncAoffset = 0;
+char syncBoffset = 0;
 
 int delta = 0; 
 
@@ -308,10 +311,10 @@ void clockOutput96PPQN(uint32_t* tick) {
     return;
   }
 
-  if ((*tick % syncAFactor) == 0) {
+  if (((*tick + syncAoffset) % syncAFactor) == 0) {
    toggleSyncAState();
   }
-  if ((*tick % syncBFactor) == 0) {
+  if (((*tick + syncBoffset) % syncBFactor) == 0) {
    toggleSyncBState();
   }
 }
@@ -405,10 +408,12 @@ void handleShift() {
     if ( !shiftIsPressed ) {
        shiftIsPressed = true;
        display.print(" # ");
+       updateScreen();
     }
     else {
        shiftIsPressed = false;
-       display.print("   ");      
+       display.print("   "); 
+       updateScreen();     
     }
 
   }
@@ -879,17 +884,19 @@ void toggleSyncBState() {
 }
 
 void handleSaveLoad() {
-  display.setCursor(0,3);
-  if ( saveLoad == 1 ) {   // SAVE
-    saveSession();
-    display.print("SAVED  "); 
-    display.println(" "); 
-  } else if ( saveLoad == 2 ) {   // LOAD
-    loadSession();
-    display.print("LOADED  "); 
-    display.println(" "); 
-  }
+  if (!editMode && saveLoad > 0 ) {
+    display.setCursor(0,3);
+    if ( saveLoad == 1 ) {   // SAVE
+      saveSession();
+      display.print("SAVED  "); 
+      display.println(" "); 
+    } else if ( saveLoad == 2 ) {   // LOAD
+      loadSession();
+      display.print("LOADED  "); 
+      display.println(" "); 
+    }
   saveLoad = 0;
+  }
 }
 
 void handleClock() {
@@ -1000,23 +1007,33 @@ void readEncoder() {
           case 5:    // MIDITHRU
             break;  
           case 6:    // syncAFactor
-             syncAFactor = syncAFactor + delta;
-             if ( syncAFactor > SYNCFACTOR_MAX ) syncAFactor = SYNCFACTOR_MAX;
-             if ( syncAFactor < SYNCFACTOR_MIN ) syncAFactor = SYNCFACTOR_MIN;
+             syncAoffset = syncAoffset + delta;
+             if (shiftIsPressed) {        // Offset            
+              if ( syncAoffset > (syncAFactor-1) ) syncAoffset = (syncAFactor-1);
+              if ( syncAoffset < SYNCFACTOR_MIN ) syncAoffset = SYNCFACTOR_MIN;
+             } else {
+              if ( syncAFactor > SYNCFACTOR_MAX ) syncAFactor = SYNCFACTOR_MAX;
+              if ( syncAFactor < SYNCFACTOR_MIN ) syncAFactor = SYNCFACTOR_MIN;               
+             }
              screenChanged = true;  
              updateScreen();          
              break;  
           case 7:    // syncBFactor
              syncBFactor = syncBFactor + delta;
-             if ( syncBFactor > SYNCFACTOR_MAX ) syncBFactor = SYNCFACTOR_MAX;
-             if ( syncBFactor < SYNCFACTOR_MIN ) syncBFactor = SYNCFACTOR_MIN;
+             if (shiftIsPressed) {        // Offset            
+              if ( syncBoffset > (syncBFactor-1) ) syncBoffset = (syncBFactor-1);
+              if ( syncBoffset < SYNCFACTOR_MIN ) syncBoffset = SYNCFACTOR_MIN;
+             } else {
+              if ( syncBFactor > SYNCFACTOR_MAX ) syncBFactor = SYNCFACTOR_MAX;
+              if ( syncBFactor < SYNCFACTOR_MIN ) syncBFactor = SYNCFACTOR_MIN;               
+             }
              screenChanged = true;  
              updateScreen();          
              break;    
           case 8:    // SEQ MUTE screen
             break; 
           case 9:    // SAVE / LOAD
-             if ((saveLoad + delta) > 0 && (saveLoad + delta) > 3) {
+             if ((saveLoad + delta) > 0 && (saveLoad + delta) < 3) {
                  saveLoad = saveLoad + delta;
              }
              delayStuff();
@@ -1086,10 +1103,18 @@ void updateScreen() {
              }   //midiThru                             
              break;
           case 6:    // syncAFactor
-             display.print(syncAFactor);           
+            if (shiftIsPressed) {        // Offset 
+             display.print(syncAoffset);        
+            } else {
+             display.print(syncAFactor);    
+            }   
              break;    
           case 7:    // syncBFactor
-             display.print(syncBFactor);           
+            if (shiftIsPressed) {        // Offset 
+             display.print(syncBoffset);        
+            } else {
+             display.print(syncBFactor);    
+            }             
              break; 
           case 8:    // SEQ MUTE screen
              for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
