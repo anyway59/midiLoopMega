@@ -176,11 +176,11 @@ const char *screenNames[] = {
 
 #define NUMSCREENS 10
 
-char syncAFactor = 12;
-char syncBFactor = 3;
+int syncAFactor = 12;
+int syncBFactor = 3;
 
-char syncAoffset = 0;
-char syncBoffset = 0;
+int syncAoffset = 0;
+int syncBoffset = 0;
 
 int delta = 0; 
 
@@ -335,7 +335,7 @@ void setup() {
     display.set2X();
     display.println("");
     display.println("MIDILOOPER");
-    display.print(F("SRAM left: "));
+  //  display.print(F("SRAM left: "));
     display.println(freeRam());
     delay(3000);
     //display.set1X();
@@ -413,16 +413,19 @@ void setup() {
 void handleShift() {
   if (btnShiftPressed) {
     btnShiftPressed = false;
-    display.setCursor(86,3);
     if ( !shiftIsPressed ) {
        shiftIsPressed = true;
-       display.print(" # ");
+       screenChanged = true; 
        updateScreen();
+       display.setCursor(98,6);
+       display.print("#");
     }
     else {
-       shiftIsPressed = false;
-       display.print("   "); 
-       updateScreen();     
+       shiftIsPressed = false;        
+       screenChanged = true; 
+       updateScreen(); 
+       display.setCursor(98,6);
+       display.print(" ");    
     }
 
   }
@@ -645,11 +648,11 @@ void handleStartStop() {
     
     if (isPlaying )  {
       display.setCursor(86,6);
-      display.print(" ~ ");      
+      display.print("~");      
     }
     else {
         display.setCursor(86,6);
-        display.print("   ");      
+        display.print(" ");      
     }
   }
 
@@ -1016,11 +1019,12 @@ void readEncoder() {
           case 5:    // MIDITHRU
             break;  
           case 6:    // syncAFactor
-             syncAoffset = syncAoffset + delta;
-             if (shiftIsPressed) {        // Offset            
+             if (shiftIsPressed) {        // Offset  
+              syncAoffset = syncAoffset + delta;          
               if ( syncAoffset > (syncAFactor-1) ) syncAoffset = (syncAFactor-1);
-              if ( syncAoffset < SYNCFACTOR_MIN ) syncAoffset = SYNCFACTOR_MIN;
+              if ( syncAoffset < 0 ) syncAoffset = 0;
              } else {
+              syncAFactor = syncAFactor + delta;
               if ( syncAFactor > SYNCFACTOR_MAX ) syncAFactor = SYNCFACTOR_MAX;
               if ( syncAFactor < SYNCFACTOR_MIN ) syncAFactor = SYNCFACTOR_MIN;               
              }
@@ -1028,11 +1032,12 @@ void readEncoder() {
              updateScreen();          
              break;  
           case 7:    // syncBFactor
-             syncBFactor = syncBFactor + delta;
-             if (shiftIsPressed) {        // Offset            
+             if (shiftIsPressed) {        // Offset  
+              syncBoffset = syncBoffset + delta;          
               if ( syncBoffset > (syncBFactor-1) ) syncBoffset = (syncBFactor-1);
-              if ( syncBoffset < SYNCFACTOR_MIN ) syncBoffset = SYNCFACTOR_MIN;
+              if ( syncBoffset < 0 ) syncBoffset = 0;
              } else {
+               syncBFactor = syncBFactor + delta;
               if ( syncBFactor > SYNCFACTOR_MAX ) syncBFactor = SYNCFACTOR_MAX;
               if ( syncBFactor < SYNCFACTOR_MIN ) syncBFactor = SYNCFACTOR_MIN;               
              }
@@ -1112,7 +1117,8 @@ void updateScreen() {
              }   //midiThru                             
              break;
           case 6:    // syncAFactor
-            if (shiftIsPressed) {        // Offset 
+            if (shiftIsPressed) {        // Offset
+             display.print("+"); 
              display.print(syncAoffset);        
             } else {
              display.print(syncAFactor);    
@@ -1120,6 +1126,7 @@ void updateScreen() {
              break;    
           case 7:    // syncBFactor
             if (shiftIsPressed) {        // Offset 
+             display.print("+");
              display.print(syncBoffset);        
             } else {
              display.print(syncBFactor);    
