@@ -109,7 +109,8 @@ bool mutesChanged = false;
 bool isMuted[4] = {false, false, false, false};
 byte seqChannels[4] = { VKEYSMIDI, VKEYSMIDI, SEQ3MIDI, SEQ4MIDI };
 
-MIDI_CREATE_DEFAULT_INSTANCE();
+//MIDI_CREATE_DEFAULT_INSTANCE();
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial, MIDI);
 
 bool midiThruChannels = (bool)USE_MIDI_THRU_CHANNELS;
 
@@ -131,8 +132,8 @@ byte saveLoad = 0;
 
 unsigned int counter = 0;
 
-bool syncAstate = false;
-bool syncBstate = false;
+bool syncAstate = true;
+bool syncBstate = true;
 
 bool isPlaying = false;
 bool isPlayingSwitchState = false;
@@ -186,6 +187,8 @@ int delta = 0;
 
 float tempo = 120.0;
 
+/*
+
 class ArpState {
   public:
   byte list[MAX_KEY_PRESSED];
@@ -232,6 +235,8 @@ ArpState arpState;
 bool arpIsOn = false;
 bool arpPreviousState = false;
 
+*/
+
 int freeRam() {
   extern int __heap_start,*__brkval;
   int v;
@@ -254,7 +259,8 @@ void clockOutput16PPQN(uint32_t* tick) {
 
   
 
-  if (!arpIsOn) {
+ // if (!arpIsOn) {
+   if (true) {
     
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
       if (previousNote[channel] > 0) {
@@ -277,7 +283,7 @@ void clockOutput16PPQN(uint32_t* tick) {
        MIDI.sendNoteOn(previousNote[currentChannel], 0, seqChannels[currentChannel] );
       previousNote[currentChannel] = 0;
     }
-
+    /*
     if (arpState.count > 0) {
       byte note = arpState.getNote();
 
@@ -287,6 +293,7 @@ void clockOutput16PPQN(uint32_t* tick) {
       MIDI.sendNoteOn(note, 127, seqChannels[currentChannel] );
       previousNote[currentChannel] = note;
     }
+    */
   }
 
   currentPosition = (currentPosition + 1) % currentSeqLength;
@@ -535,11 +542,12 @@ void handleCurrentChannel() {
      
 
 
-
+   /*
     if (channelStates[1] && !arpPreviousState) {
       arpIsOn = !arpIsOn;
       arpPreviousState = true;
     }
+    */
     
   } else {
     mutesChanged = false;
@@ -575,10 +583,11 @@ void handleCurrentChannel() {
       //}
     }
   }
-
+  /*
   if (channelStates[1] == false) {
     arpPreviousState = false;
   }
+  */
 }
 
 
@@ -768,7 +777,7 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
     }
   } else {
 
-    arpState.addNote(note);
+    //arpState.addNote(note);
   
     if (midiThru) {
       MIDI.sendNoteOn(note, velocity, channel);
@@ -799,11 +808,11 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
         
       } else {
         
-        if (arpIsOn) {
+        //if (arpIsOn) {
         
-        } else {
+        //} else {
           sequence[currentChannel][currentPosition] = note;
-        }
+        //}
       }
     }
   }
@@ -821,7 +830,7 @@ void handleNoteOff(byte channel, byte note, byte velocity) {
     isMuted[channel] = false;
     
   } else {
-      arpState.removeNote(note);
+      //arpState.removeNote(note);
       
       if (midiThru) {
         MIDI.sendNoteOff(note, velocity, channel);
