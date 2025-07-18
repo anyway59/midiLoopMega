@@ -12,15 +12,6 @@
 #define I2C_ADDRESS 0x3C
 SSD1306AsciiAvrI2c display;
 
-// #define TEMPO_ANALOG_IN 0
-// #define BARCOUNT_ANALOG_IN 1
-// #define STEPCOUNT_ANALOG_IN 2
-// #define MIDITHRU_ANALOG_IN 3
-// #define TRANSPOSE_ANALOG_IN 4
-// #define SHIFT_ANALOG_IN 5
-// #define ERASE_ANALOG_IN 6
-// #define PLAYSTOP_ANALOG_IN 7
-
 #define SHIFT_PIN 12 
 #define ERASE_PIN 11
 #define PLAYSTOP_PIN 10
@@ -33,13 +24,6 @@ SSD1306AsciiAvrI2c display;
 
 
 #define VBASSMIDI 5   // Volca Bass Channel for transposing
-
-
-
-// #define CHANNEL_4_LED 2
-// #define CHANNEL_3_LED 3
-// #define CHANNEL_1_LED 4 // Yes, I inverted the 1 & 2 LEDS when I built my box :|
-// #define CHANNEL_2_LED 5
 
 // #define OUT_GATE 6
 #define OUT_ASYNC 2
@@ -54,11 +38,7 @@ SSD1306AsciiAvrI2c display;
 #define INPUTCLK 3
 #define INPUTDT 4
 
-
-
 #define CONTROLCHECK 250
-
-// #define BEATOUT_LED 12
 
 #define CHANNEL_COUNT 4
 #define SEQUENCE_LENGTH_MAX 128
@@ -80,8 +60,6 @@ const byte BARCOUNTMAX = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX;
 //THIS is for my personal use
 //This will map channel 5,6,7,8 as channel 1,2,3,4 MIDI thru
 #define USE_MIDI_THRU_CHANNELS 0   // disabled
-
-//byte ledPins[4] = {CHANNEL_1_LED, CHANNEL_2_LED, CHANNEL_3_LED, CHANNEL_4_LED};
 
 // buttons
 Button btn1;
@@ -131,7 +109,6 @@ bool useMidiClock = false;
 int currentSeqLength = 16;
 
 byte saveLoad = 0;
-
 
 unsigned int counter = 0;
 
@@ -190,56 +167,6 @@ int delta = 0;
 
 float tempo = 120.0;
 
-/*
-
-class ArpState {
-  public:
-  byte list[MAX_KEY_PRESSED];
-  byte count = 0;
-  byte arpPos = 0;
-
-  void addNote(byte note) {
-    if (count < MAX_KEY_PRESSED) {
-      list[count] = note;
-      count++;
-    }
-  }
-
-  void removeNote(byte note) {
-    bool pop = false;
-    for (byte i = 0 ; i < count; i++) {
-      if (list[i] == note) {
-        pop = true;
-      }
-      if (pop && (i+1) < count) {
-        list[i] = list[i+1];
-      }
-    }
-    if (pop) {
-      count--;
-    }
-  }
-
-  byte getNote() {
-    byte pos = arpPos;
-    arpPos++;
-    if (arpPos >= count) {
-      arpPos = 0;
-    }
-    while (pos >= count && pos > 0) {
-      pos--;
-    }
-    return list[pos];
-  }
-};
-
-ArpState arpState;
-
-bool arpIsOn = false;
-bool arpPreviousState = false;
-
-*/
-
 int freeRam() {
   extern int __heap_start,*__brkval;
   int v;
@@ -254,15 +181,8 @@ void clockOutput16PPQN(uint32_t* tick) {
   }
 
   bool isQuarterBeat = (((currentPosition % currentStepCount) % 4) == 0);
-  //digitalWrite(BEATOUT_LED, isQuarterBeat); 
- // display.setCursor(112,4);
- // if ( isQuarterBeat ) {
- //   display.print("QBT");
- // }
 
-  
 
- // if (!arpIsOn) {
    if (true) {
     
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
@@ -286,17 +206,7 @@ void clockOutput16PPQN(uint32_t* tick) {
        MIDI.sendNoteOn(previousNote[currentChannel], 0, seqChannels[currentChannel] );
       previousNote[currentChannel] = 0;
     }
-    /*
-    if (arpState.count > 0) {
-      byte note = arpState.getNote();
 
-      // try this
-      //note  += transpose[currentChannel];
-      
-      MIDI.sendNoteOn(note, 127, seqChannels[currentChannel] );
-      previousNote[currentChannel] = note;
-    }
-    */
   }
 
   currentPosition = (currentPosition + 1) % currentSeqLength;
@@ -310,9 +220,6 @@ void clockOutput32PPQN(uint32_t* tick) {
     return;
   }
 
-  //if ((*tick % syncAFactor) == 0) {
-  // toggleSyncAState();
-  //}
   
 }
 
@@ -352,7 +259,7 @@ void setup() {
     display.clear();
 
     // buttons
-    //pinMode(SELECT_PIN, INPUT_PULLUP);
+
 
     
     btn1.begin(CHANNEL_1_PIN);
@@ -387,19 +294,7 @@ void setup() {
       previousNote[channel] = 0;
   }
 
- // pinMode(CHANNEL_1_LED, OUTPUT);
- // pinMode(CHANNEL_2_LED, OUTPUT);
- // pinMode(CHANNEL_3_LED, OUTPUT);
- // pinMode(CHANNEL_4_LED, OUTPUT);
 
-  // pinMode(CHANNEL_1_PIN, INPUT);
-  // pinMode(CHANNEL_2_PIN, INPUT);
-  // pinMode(CHANNEL_3_PIN, INPUT);
-  // pinMode(CHANNEL_4_PIN, INPUT);
-
-  //pinMode(BEATOUT_LED, OUTPUT);
-
-  // pinMode(OUT_GATE, OUTPUT);
   pinMode(OUT_ASYNC, OUTPUT);
   pinMode(OUT_BSYNC, OUTPUT);
 
@@ -445,9 +340,7 @@ void handleShift() {
 }
 
 void handleErase() {
-  //int erase = analogRead(ERASE_ANALOG_IN);
 
- // if (erase > 200) {
     if (btnErasePressed) {
       btnErasePressed = false;
       if (!shiftIsPressed) {
@@ -513,10 +406,7 @@ void handleCurrentChannel() {
     btn4Pressed = false;
     channelButtonPressed = true;
   }
-  // channelStates[0] = digitalRead(CHANNEL_1_PIN) == HIGH;
-  // channelStates[1] = digitalRead(CHANNEL_2_PIN) == HIGH;
-  // channelStates[2] = digitalRead(CHANNEL_3_PIN) == HIGH;
-  // channelStates[3] = digitalRead(CHANNEL_4_PIN) == HIGH;
+
 
   if (channelButtonPressed && shiftIsPressed) {
 
@@ -544,13 +434,6 @@ void handleCurrentChannel() {
     }
      
 
-
-   /*
-    if (channelStates[1] && !arpPreviousState) {
-      arpIsOn = !arpIsOn;
-      arpPreviousState = true;
-    }
-    */
     
   } else {
     mutesChanged = false;
@@ -579,18 +462,10 @@ void handleCurrentChannel() {
         previousChannel = currentChannel;   
       }
 
-      //for (byte i = 0; i < CHANNEL_COUNT; i++) {
-        //bool state = i == (currentChannel); 
-        //digitalWrite(ledPins[i], state ? HIGH : LOW);
 
-      //}
     }
   }
-  /*
-  if (channelStates[1] == false) {
-    arpPreviousState = false;
-  }
-  */
+
 }
 
 
@@ -624,12 +499,10 @@ void setIsPlaying(bool state) {
       }
     }
         
-    // digitalWrite(OUT_GATE, LOW);
+
     digitalWrite(OUT_ASYNC, LOW);
     digitalWrite(OUT_BSYNC, LOW);
-    //digitalWrite(BEATOUT_LED, LOW); 
-   // display.setCursor(112,4);
-  //  display.print("    ");     
+  
 
     //delay(20);
     currentPosition = 0;
@@ -638,8 +511,7 @@ void setIsPlaying(bool state) {
 }
 
 void handleStartStop() {
-  // int startStopStart = analogRead(PLAYSTOP_ANALOG_IN);  
-  // bool newPlayingState = (startStopStart > 200);
+
 
 
   
@@ -677,11 +549,7 @@ void sendVbTranspose() {
          MIDI.sendControlChange(44, vbPitch, VBASSMIDI);
          MIDI.sendControlChange(45, vbPitch, VBASSMIDI); 
          lastvbPitch = vbPitch;     
-         //display.setCursor(0,5);  
-         //display.print("VBCH,P: ");
-         //display.print(VBASSMIDI);
-         //display.print(","); 
-         //display.println(vbPitch);         
+      
       }
 }
 ;
@@ -739,12 +607,7 @@ void loop() {
   
   handleShift();
   
-  //handleTempo();
-  //handleBarCount();
-  //handleStepCount();
-  
-  // handleMidiThru();
-  //handleTranspose();
+
   handleStartStop();
   handleCurrentChannel();
   
@@ -759,8 +622,7 @@ void loop() {
     delayIsRunning = false;
   }
 
-  //for debug purpose
-  //digitalWrite(CHANNEL_1_LED, shiftIsPressed ? HIGH : LOW);
+
   
   MIDI.read();
 }
@@ -780,7 +642,7 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
     }
   } else {
 
-    //arpState.addNote(note);
+
   
     if (midiThru) {
       MIDI.sendNoteOn(note, velocity, channel);
@@ -811,11 +673,9 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
         
       } else {
         
-        //if (arpIsOn) {
-        
-        //} else {
+
           sequence[currentChannel][currentPosition] = note;
-        //}
+
       }
     }
   }
