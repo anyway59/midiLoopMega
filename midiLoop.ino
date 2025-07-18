@@ -26,10 +26,13 @@ SSD1306AsciiAvrI2c display;
 #define PLAYSTOP_PIN 10
 #define SELECT_PIN 9
 
-#define VKEYSMIDI 1   // Volca Keys at Midi Channel 1
-#define SEQ3MIDI 1   // 3rd Sequence at Midi Channel 3
-#define SEQ4MIDI 2   // 4th Sequence at Midi Channel 2
-#define VBASSMIDI 4   // Volca Bass at Midi Channel 4
+#define SEQ1MIDI 1  
+#define SEQ2MIDI 2   
+#define SEQ3MIDI 3  
+#define SEQ4MIDI 4 
+
+
+#define VBASSMIDI 5   // Volca Bass Channel for transposing
 
 
 
@@ -107,7 +110,7 @@ bool mutesChanged = false;
 
 
 bool isMuted[4] = {false, false, false, false};
-byte seqChannels[4] = { VKEYSMIDI, VKEYSMIDI, SEQ3MIDI, SEQ4MIDI };
+byte seqChannels[4] = { SEQ1MIDI, SEQ2MIDI, SEQ3MIDI, SEQ4MIDI };
 
 //MIDI_CREATE_DEFAULT_INSTANCE();
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial, MIDI);
