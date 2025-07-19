@@ -85,6 +85,8 @@ bool mutesChanged = false;
 
 
 bool isMuted[4] = {false, false, false, false};
+bool noteIsHeld[4] = {false, false, false, false};
+
 byte seqChannels[4] = { SEQ1MIDI, SEQ2MIDI, SEQ3MIDI, SEQ4MIDI };
 
 
@@ -179,35 +181,52 @@ void clockOutput16PPQN(uint32_t* tick) {
 
   bool isQuarterBeat = (((currentPosition % currentStepCount) % 4) == 0);
 
+/* Previous logic:
+  if the previous note was non zero then do a NoteOFF for the previous note
+  if the current note is non zero then do a NoteON for the current note
+  This means that notes cannot play longer than a single step
 
-   if (true) {
+  New logic:
+  if the channel is muted then do nothing   NOTE: need to stop any playing notes when going into mute
+                                            NOTE: need to stop any playing notes when stopping play
+  if the current note is different from the previous note:
+     do a NoteOFF for the previous note
+     set the previous note to the current note
+     if the current note is non-zero:
+        do a NoteON for the current note
+  */
+
     
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
-      if (previousNote[channel] > 0) {
-          MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] );
-          previousNote[channel] = 0;
-      }
 
+      if (!isMuted[channel]) {
       byte currentNote = sequence[channel][currentPosition];
+      byte transposedNote = currentNote + transpose[channel];
+        if (previousNote[channel] != transposedNote) {
+          MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] );    // Equivalent to NoteOFF
+          
+          if (currentNote > 0) {
+            
+            MIDI.sendNoteOn(transposedNote, 127, seqChannels[channel] );
+          }
+          previousNote[channel] = transposedNote;
 
-      if (currentNote > 0 && !isMuted[channel]) {
-          currentNote += transpose[channel];
-        
-          MIDI.sendNoteOn(currentNote, 127, seqChannels[channel] );
-          previousNote[channel] = currentNote;
+        }
       }
-    }
-    
-  } else {
-    if (previousNote[currentChannel] > 0) {
-       MIDI.sendNoteOn(previousNote[currentChannel], 0, seqChannels[currentChannel] );
-      previousNote[currentChannel] = 0;
-    }
 
+    }
+  
+  byte heldNote;
+
+  if ( noteIsHeld[currentChannel] ) {  
+     heldNote = sequence[currentChannel][currentPosition];
   }
-
+    
   currentPosition = (currentPosition + 1) % currentSeqLength;
 
+  if ( noteIsHeld[currentChannel] ) {
+    sequence[currentChannel][currentPosition] = heldNote;
+  }
 
 }
 
@@ -627,12 +646,12 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
 
 
 
-
-  
     if (midiThru) {
       MIDI.sendNoteOn(note, velocity, channel);
     } else {
-
+     if ( velocity == 0 ) {    // noteON with velocity 0 is like note OFF
+        noteIsHeld[currentChannel] = false; 
+     } else {
       if (transposeMode) {
        if ( transposeVB ) {
 
@@ -660,8 +679,9 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
         
 
           sequence[currentChannel][currentPosition] = note;
-
+          noteIsHeld[currentChannel] = true; 
       }
+    }
     }
 
 }
@@ -670,7 +690,7 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
 
 void handleNoteOff(byte channel, byte note, byte velocity) {
   
-
+      noteIsHeld[currentChannel] = false; 
       
       if (midiThru) {
         MIDI.sendNoteOff(note, velocity, channel);
