@@ -52,14 +52,11 @@ SSD1306AsciiAvrI2c display;
 
 #define MAX_KEY_PRESSED 10
 
-// #define LOOPER_CHANNEL 12
 
 
 const byte BARCOUNTMAX = SEQUENCE_LENGTH_MAX/STEP_PER_BAR_MAX; 
 
-//THIS is for my personal use
-//This will map channel 5,6,7,8 as channel 1,2,3,4 MIDI thru
-// #define USE_MIDI_THRU_CHANNELS 0   // disabled
+
 
 // buttons
 Button btn1;
@@ -90,10 +87,10 @@ bool mutesChanged = false;
 bool isMuted[4] = {false, false, false, false};
 byte seqChannels[4] = { SEQ1MIDI, SEQ2MIDI, SEQ3MIDI, SEQ4MIDI };
 
-//MIDI_CREATE_DEFAULT_INSTANCE();
+
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial, MIDI);
 
-// bool midiThruChannels = (bool)USE_MIDI_THRU_CHANNELS;
+
 
 bool shiftIsPressed = false;
 
@@ -334,8 +331,7 @@ void handleShift() {
     }
 
   }
- // int shiftState = analogRead(SHIFT_ANALOG_IN);
- // shiftIsPressed = (shiftState > 200);
+
 
 }
 
@@ -629,18 +625,7 @@ void loop() {
 
 void handleNoteOn(byte channel, byte note, byte velocity) {
 
- /* if (midiThruChannels && (channel >= 5 && channel <= 8)) {
-    MIDI.sendNoteOn(note, velocity, channel - 4);
-    
-  } else if (channel == LOOPER_CHANNEL && note >= 60 && note <= 63) {
-    byte channel = note - 60;
-    isMuted[channel] = (velocity > 0);
 
-  } else if (channel == LOOPER_CHANNEL && note == 70) {
-    if (velocity > 0) {
-      eraseAll();
-    }
-  } else { */
 
 
   
@@ -678,28 +663,19 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
 
       }
     }
-  // }
+
 }
 
 
 
 void handleNoteOff(byte channel, byte note, byte velocity) {
   
-  /* if (midiThruChannels && (channel >= 5 && channel <= 8)) {
-    MIDI.sendNoteOff(note, velocity, channel - 4);
-    
-  }  else if (channel == LOOPER_CHANNEL && note >= 60 && note <= 63) {
-    byte channel = note - 60;
-    isMuted[channel] = false;
-    
-  } 
-  else { */
-      //arpState.removeNote(note);
+
       
       if (midiThru) {
         MIDI.sendNoteOff(note, velocity, channel);
       }
- // }
+
 }
 
 void handlePitchBend(byte channel, int bend) {
@@ -712,22 +688,18 @@ void handlePitchBend(byte channel, int bend) {
 
 void handleProgramChange(byte channel, byte number) {
 
-  //if (midiThruChannels && (channel >= 5 && channel <= 8)) {
-  //  MIDI.sendProgramChange(number, channel - 4);
- // } else {
+
     MIDI.sendProgramChange(number, channel);
-  //}
+
   
   
 }
 
 void handleControlChange(byte channel, byte control, byte value) {
 
- // if (midiThruChannels && (channel >= 5 && channel <= 8)) {
- //   MIDI.sendControlChange(control, value, channel - 4);
- // } else {
+
     MIDI.sendControlChange(control, value, channel);
- // }
+
   
 }
 
