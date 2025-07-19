@@ -186,9 +186,8 @@ void clockOutput16PPQN(uint32_t* tick) {
   if the current note is non zero then do a NoteON for the current note
   This means that notes cannot play longer than a single step
 
-  New logic:
-  if the channel is muted then do nothing   NOTE: need to stop any playing notes when going into mute
-                                            NOTE: need to stop any playing notes when stopping play
+  New playback logic:
+  if the channel is muted then do nothing   
   if the current note is different from the previous note:
      do a NoteOFF for the previous note
      set the previous note to the current note
@@ -198,10 +197,10 @@ void clockOutput16PPQN(uint32_t* tick) {
 
     
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
-
+ 
       if (!isMuted[channel]) {
-      byte currentNote = sequence[channel][currentPosition];
-      byte transposedNote = currentNote + transpose[channel];
+       byte currentNote = sequence[channel][currentPosition];
+       byte transposedNote = currentNote + transpose[channel];
         if (previousNote[channel] != transposedNote) {
           MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] );    // Equivalent to NoteOFF
           
@@ -460,6 +459,11 @@ void handleCurrentChannel() {
         }
         else {
           isMuted[i] = ( !isMuted[i] );   // toggle muted status
+          if (isMuted[i]) {     // when muting, switch off any long notes
+            if (previousNote[i] > 0) {
+                MIDI.sendNoteOn(previousNote[i], 0, seqChannels[i] ); // NoteOFF
+            }
+          }
           mutesChanged = true;
         }
       }
@@ -509,9 +513,10 @@ void setIsPlaying(bool state) {
 
     for (size_t channel = 0; channel < CHANNEL_COUNT; channel++) {
       if (previousNote[channel] > 0) {
-        MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] );
+        MIDI.sendNoteOn(previousNote[channel], 0, seqChannels[channel] ); // NoteOFF
         previousNote[channel] = 0;
       }
+      noteIsHeld[channel] = false; 
     }
         
 
