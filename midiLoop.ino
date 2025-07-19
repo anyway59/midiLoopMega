@@ -532,9 +532,6 @@ void setIsPlaying(bool state) {
 
 void handleStartStop() {
 
-
-
-  
   if (btnPlayStopPressed) {
     btnPlayStopPressed = false;
     if ( isPlayingSwitchState == true ) {
@@ -651,8 +648,8 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
 
 
 
-    if (midiThru) {
-      MIDI.sendNoteOn(note, velocity, channel);
+    if (! isPlaying) {
+      MIDI.sendNoteOn(note, velocity, seqChannels[currentChannel]);
     } else {
      if ( velocity == 0 ) {    // noteON with velocity 0 is like note OFF
         noteIsHeld[currentChannel] = false; 
@@ -697,16 +694,16 @@ void handleNoteOff(byte channel, byte note, byte velocity) {
   
       noteIsHeld[currentChannel] = false; 
       
-      if (midiThru) {
-        MIDI.sendNoteOff(note, velocity, channel);
+      if (!isPlaying) {
+        MIDI.sendNoteOff(note, velocity, seqChannels[currentChannel]);
       }
 
 }
 
 void handlePitchBend(byte channel, int bend) {
 
-  if (midiThru) {
-    MIDI.sendPitchBend(bend, channel);
+  if (!isPlaying) {
+    MIDI.sendPitchBend(bend, seqChannels[currentChannel]);
   }
   
 }
@@ -714,8 +711,11 @@ void handlePitchBend(byte channel, int bend) {
 void handleProgramChange(byte channel, byte number) {
 
 
-    MIDI.sendProgramChange(number, channel);
+    //MIDI.sendProgramChange(number, channel);
 
+  if (!isPlaying) {
+    MIDI.sendProgramChange(number, seqChannels[currentChannel]);
+  }
   
   
 }
@@ -723,8 +723,11 @@ void handleProgramChange(byte channel, byte number) {
 void handleControlChange(byte channel, byte control, byte value) {
 
 
-    MIDI.sendControlChange(control, value, channel);
+    //MIDI.sendControlChange(control, value, channel);
 
+  if (!isPlaying) {
+    MIDI.sendControlChange(control, value, seqChannels[currentChannel]);
+  }
   
 }
 
